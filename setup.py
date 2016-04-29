@@ -1083,7 +1083,7 @@ files.extend(
     os.path.join("src/libImaging", src_file + ".c") for src_file in _LIB_IMAGING
 )
 ext_modules = [
-    Extension("PIL._imaging", files),
+    Extension("PIL._imaging", files, extra_compile_args=["-msse4"]),
     Extension("PIL._imagingft", ["src/_imagingft.c"]),
     Extension("PIL._imagingcms", ["src/_imagingcms.c"]),
     Extension("PIL._webp", ["src/_webp.c"]),
