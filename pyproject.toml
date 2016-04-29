@@ -8,9 +8,9 @@ backend-path = [
 ]
 
 [project]
-name = "pillow"
+name = "pillow-simd"
 description = "Python Imaging Library (Fork)"
-readme = "README.md"
+readme = "PyPI.rst"
 keywords = [
   "Imaging",
 ]
@@ -75,10 +75,10 @@ xmp = [
 Changelog = "https://github.com/python-pillow/Pillow/blob/main/CHANGES.rst"
 Documentation = "https://pillow.readthedocs.io"
 Funding = "https://tidelift.com/subscription/pkg/pypi-pillow?utm_source=pypi-pillow&utm_medium=pypi"
-Homepage = "https://python-pillow.org"
+Homepage = "https://github.com/uploadcare/pillow-simd"
 Mastodon = "https://fosstodon.org/@pillow"
 "Release notes" = "https://pillow.readthedocs.io/en/stable/releasenotes/index.html"
-Source = "https://github.com/python-pillow/Pillow"
+Source = "https://github.com/uploadcare/pillow-simd"
 
 [tool.setuptools]
 packages = ["PIL"]
