@@ -10,7 +10,6 @@ include *.yaml
 include LICENSE
 include Makefile
 include tox.ini
-graft Tests
 graft src
 graft depends
 graft winbuild
@@ -25,8 +24,10 @@ exclude .editorconfig
 exclude .readthedocs.yml
 exclude codecov.yml
 exclude renovate.json
+global-exclude .DS_Store
 global-exclude .git*
 global-exclude *.pyc
 global-exclude *.so
 prune .ci
 prune wheels
+prune Tests
