@@ -46,7 +46,7 @@ Currently, following operations are accelerated:
 
 The numbers in the table represent processed megapixels of source image
 per second. For example, if resize of 7712×4352 image is done in 0.5 seconds,
-the result will be 61.7 Mpx/s.
+the result will be 67.1 Mpx/s.
 
 - ImageMagick 6.9.3-8 Q8 x86_64
 - Pillow 3.2.0
