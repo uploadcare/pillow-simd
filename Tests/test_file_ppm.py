@@ -122,7 +122,7 @@ def test_pnm(tmp_path: Path) -> None:
 def test_pfm(tmp_path: Path) -> None:
     with Image.open("Tests/images/hopper.pfm") as im:
         assert im.info["scale"] == 1.0
-        assert_image_equal(im, hopper("F"))
+        assert_image_similar(im, hopper("F"), 0.0001)
 
         filename = tmp_path / "tmp.pfm"
         im.save(filename)
@@ -133,7 +133,7 @@ def test_pfm(tmp_path: Path) -> None:
 def test_pfm_big_endian(tmp_path: Path) -> None:
     with Image.open("Tests/images/hopper_be.pfm") as im:
         assert im.info["scale"] == 2.5
-        assert_image_equal(im, hopper("F"))
+        assert_image_similar(im, hopper("F"), 0.0001)
 
         filename = tmp_path / "tmp.pfm"
         im.save(filename)
