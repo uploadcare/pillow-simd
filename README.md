@@ -1,8 +1,8 @@
 # Pillow-SIMD
 
-Pillow-SIMD is "following" Pillow fork (which is PIL fork itself).
+Pillow-SIMD is "following" the Pillow fork (which is a PIL's fork itself).
 
-For more information about original Pillow, please
+For more information on the original Pillow, please refer to:
 [read the documentation][original-docs],
 [check the changelog][original-changelog] and
 [find out how to contribute][original-contribute].
@@ -10,24 +10,12 @@ For more information about original Pillow, please
 
 ## Why SIMD
 
-There are many ways to improve the performance of image processing.
-You can use better algorithms for the same task, you can make better
-implementation for current algorithms, or you can use more processing unit
-resources. It is perfect when you can just use more efficient algorithm like
-when gaussian blur based on convolutions [was replaced][gaussian-blur-changes]
-by sequential box filters. But a number of such improvements are very limited.
-It is also very tempting to use more processor unit resources 
-(via parallelization) when they are available. But it is handier just
-to make things faster on the same resources. And that is where SIMD works better.
+There are multiple ways to tweak image processing performance.
+To name a few, such ways can be: utilizing better algorithms, optimizing existing implementations, using more processing power and/or resources. One of the great examples of using a more efficient algorithm is [replacing][gaussian-blur-changes] a convoloution-based Gaussian blur with a sequential-box one. Such examples are rather rare though. It is also known that certain processes might be optimized by using parallel processing to run the respective routines. But a more practical key to optimizations might be making things work faster using the resources at hand. For instance, SIMD computing might be the case.
 
-SIMD stands for "single instruction, multiple data". This is a way to perform
-same operations against the huge amount of homogeneous data. 
-Modern CPU have different SIMD instructions sets like
-MMX, SSE-SSE4, AVX, AVX2, AVX512, NEON.
+SIMD stands for "single instruction, multiple data" and it's essence is in performing the same operation on multiple data points simultaneously by using multiple processing elements. Common CPU SIMD instruction sets are: MMX, SSE-SSE4, AVX, AVX2, AVX512, NEON.
 
-Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default)
-and AVX2 support.
-
+Currently, Pillow-SIMD can be [compiled](#installation) with SSE4 (default) and **or???** AVX2 support.
 
 ## Status
 
