@@ -103,7 +103,7 @@ The easiest way to do so is to define the `CC` variable during the compilation.
 
 ```bash
 $ pip uninstall pillow
-$ CC="cc -mavx2" pip install -U --force-reinstall pillow-simd
+$ CC="cc -mavx2" pip install -U --force-reinstall --no-binary pillow-simd pillow-simd
 ```
 
 
