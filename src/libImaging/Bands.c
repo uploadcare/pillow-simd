@@ -18,6 +18,15 @@
 
 #include "Imaging.h"
 
+#include <emmintrin.h>
+#include <mmintrin.h>
+#include <smmintrin.h>
+
+#if defined(__AVX2__)
+    #include <immintrin.h>
+#endif
+
+
 
 #define CLIP(x) ((x) <= 0 ? 0 : (x) < 256 ? (x) : 255)
 
@@ -53,7 +62,10 @@ ImagingGetBand(Imaging imIn, int band)
         UINT8* out = imOut->image8[y];
         x = 0;
         for (; x < imIn->xsize - 3; x += 4) {
-            *((UINT32*) (out + x)) = MAKE_UINT32(in[0], in[4], in[8], in[12]);
+            __m128i source = _mm_loadu_si128((__m128i *) in);
+            *((UINT32*) (out + x)) = _mm_cvtsi128_si32(
+                _mm_shuffle_epi8(source, _mm_set_epi8(
+                    -1,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1, 12,8,4,0)));
             in += 16;
         }
         for (; x < imIn->xsize; x++) {
@@ -101,8 +113,12 @@ ImagingSplit(Imaging imIn, Imaging bands[4])
             UINT8* out1 = bands[1]->image8[y];
             x = 0;
             for (; x < imIn->xsize - 3; x += 4) {
-                *((UINT32*) (out0 + x)) = MAKE_UINT32(in[0], in[4], in[8], in[12]);
-                *((UINT32*) (out1 + x)) = MAKE_UINT32(in[0+3], in[4+3], in[8+3], in[12+3]);
+                __m128i source = _mm_loadu_si128((__m128i *) in);
+                source = _mm_shuffle_epi8(source, _mm_set_epi8(
+                    15,11,7,3, 14,10,6,2, 13,9,5,1, 12,8,4,0));
+                *((UINT32*) (out0 + x)) = _mm_cvtsi128_si32(source);
+                *((UINT32*) (out1 + x)) = _mm_cvtsi128_si32(
+                    _mm_srli_si128(source, 12));
                 in += 16;
             }
             for (; x < imIn->xsize; x++) {
@@ -119,9 +135,14 @@ ImagingSplit(Imaging imIn, Imaging bands[4])
             UINT8* out2 = bands[2]->image8[y];
             x = 0;
             for (; x < imIn->xsize - 3; x += 4) {
-                *((UINT32*) (out0 + x)) = MAKE_UINT32(in[0], in[4], in[8], in[12]);
-                *((UINT32*) (out1 + x)) = MAKE_UINT32(in[0+1], in[4+1], in[8+1], in[12+1]);
-                *((UINT32*) (out2 + x)) = MAKE_UINT32(in[0+2], in[4+2], in[8+2], in[12+2]);
+                __m128i source = _mm_loadu_si128((__m128i *) in);
+                source = _mm_shuffle_epi8(source, _mm_set_epi8(
+                    15,11,7,3, 14,10,6,2, 13,9,5,1, 12,8,4,0));
+                *((UINT32*) (out0 + x)) = _mm_cvtsi128_si32(source);
+                *((UINT32*) (out1 + x)) = _mm_cvtsi128_si32(
+                    _mm_srli_si128(source, 4));
+                *((UINT32*) (out2 + x)) = _mm_cvtsi128_si32(
+                    _mm_srli_si128(source, 8));
                 in += 16;
             }
             for (; x < imIn->xsize; x++) {
@@ -140,10 +161,16 @@ ImagingSplit(Imaging imIn, Imaging bands[4])
             UINT8* out3 = bands[3]->image8[y];
             x = 0;
             for (; x < imIn->xsize - 3; x += 4) {
-                *((UINT32*) (out0 + x)) = MAKE_UINT32(in[0], in[4], in[8], in[12]);
-                *((UINT32*) (out1 + x)) = MAKE_UINT32(in[0+1], in[4+1], in[8+1], in[12+1]);
-                *((UINT32*) (out2 + x)) = MAKE_UINT32(in[0+2], in[4+2], in[8+2], in[12+2]);
-                *((UINT32*) (out3 + x)) = MAKE_UINT32(in[0+3], in[4+3], in[8+3], in[12+3]);
+                __m128i source = _mm_loadu_si128((__m128i *) in);
+                source = _mm_shuffle_epi8(source, _mm_set_epi8(
+                    15,11,7,3, 14,10,6,2, 13,9,5,1, 12,8,4,0));
+                *((UINT32*) (out0 + x)) = _mm_cvtsi128_si32(source);
+                *((UINT32*) (out1 + x)) = _mm_cvtsi128_si32(
+                    _mm_srli_si128(source, 4));
+                *((UINT32*) (out2 + x)) = _mm_cvtsi128_si32(
+                    _mm_srli_si128(source, 8));
+                *((UINT32*) (out3 + x)) = _mm_cvtsi128_si32(
+                    _mm_srli_si128(source, 12));
                 in += 16;
             }
             for (; x < imIn->xsize; x++) {
