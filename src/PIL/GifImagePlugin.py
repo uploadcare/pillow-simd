@@ -524,7 +524,8 @@ def _write_local_header(fp, im, offset, flags):
                  o8(transparency) +       # transparency index
                  o8(0))
 
-    if "comment" in im.encoderinfo and 1 <= len(im.encoderinfo["comment"]) <= 255:
+    if "comment" in im.encoderinfo and im.encoderinfo["comment"] is not None\
+        and 1 <= len(im.encoderinfo["comment"]) <= 255:
         fp.write(b"!" +
                  o8(254) +                # extension intro
                  o8(len(im.encoderinfo["comment"])) +
