@@ -20,7 +20,7 @@
 #define SHIFT_BITS (16 - 7)
 
 
-__m128i inline
+__m128i static inline
 mm_lut_pixel(INT16* table, int size2D_shift, int size3D_shift,
              int idx, __m128i shift, __m128i shuffle)
 {
@@ -65,7 +65,7 @@ mm_lut_pixel(INT16* table, int size2D_shift, int size3D_shift,
 
 
 #if defined(__AVX2__)
-__m256i inline
+__m256i static inline
 mm256_lut_pixel(INT16* table, int size2D_shift, int size3D_shift,
              int idx1, int idx2, __m256i shift, __m256i shuffle)
 {
@@ -329,7 +329,7 @@ ImagingColorLUT3D_linear(Imaging imOut, Imaging imIn, int table_channels,
     #endif
         // This makes sense if 6 or more pixels remain (two loops)
         if (x < imOut->xsize - 5) {
-            __m128i source = _mm_cvtsi64_si128(*(int64_t *) &rowIn[x]);
+            __m128i source = _mm_loadl_epi64((__m128i *) &rowIn[x]);
             // scale up to 16 bits, but scale * 255 * 256 up to 31 bits
             // bi, gi and ri - 6 bits index
             // rs, rs and rs - 9 bits shift
@@ -342,7 +342,7 @@ ImagingColorLUT3D_linear(Imaging imOut, Imaging imIn, int table_channels,
                         _mm_setzero_si128());
 
             for (; x < imOut->xsize - 3; x += 2) {
-                __m128i next_source = _mm_cvtsi64_si128(*(int64_t *) &rowIn[x + 2]);
+                __m128i next_source = _mm_loadl_epi64((__m128i *) &rowIn[x + 2]);
                 __m128i next_index = _mm_mulhi_epu16(scale,
                     _mm_unpacklo_epi8(_mm_setzero_si128(), next_source));
                 __m128i next_index_src = _mm_hadd_epi32(
