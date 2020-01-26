@@ -158,13 +158,13 @@ ImagingColorLUT3D_linear(Imaging imOut, Imaging imIn, int table_channels,
     ImagingSectionCookie cookie;
     __m128i scale = _mm_set_epi16(
         0,
-        (size3D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size2D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size1D - 1) / 255.0 * (1<<SCALE_BITS),
+        (int) ((size3D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size2D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size1D - 1) / 255.0 * (1<<SCALE_BITS)),
         0,
-        (size3D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size2D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size1D - 1) / 255.0 * (1<<SCALE_BITS));
+        (int) ((size3D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size2D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size1D - 1) / 255.0 * (1<<SCALE_BITS)));
     __m128i scale_mask = _mm_set1_epi16(SCALE_MASK >> 8);
     __m128i index_mul = _mm_set_epi16(
         0, size1D_2D*table_channels, size1D*table_channels, table_channels,
@@ -174,21 +174,21 @@ ImagingColorLUT3D_linear(Imaging imOut, Imaging imIn, int table_channels,
 #if defined(__AVX2__)
     __m256i scale256 = _mm256_set_epi16(
         0,
-        (size3D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size2D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size1D - 1) / 255.0 * (1<<SCALE_BITS),
+        (int) ((size3D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size2D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size1D - 1) / 255.0 * (1<<SCALE_BITS)),
         0,
-        (size3D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size2D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size1D - 1) / 255.0 * (1<<SCALE_BITS),
+        (int) ((size3D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size2D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size1D - 1) / 255.0 * (1<<SCALE_BITS)),
         0,
-        (size3D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size2D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size1D - 1) / 255.0 * (1<<SCALE_BITS),
+        (int) ((size3D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size2D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size1D - 1) / 255.0 * (1<<SCALE_BITS)),
         0,
-        (size3D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size2D - 1) / 255.0 * (1<<SCALE_BITS),
-        (size1D - 1) / 255.0 * (1<<SCALE_BITS));
+        (int) ((size3D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size2D - 1) / 255.0 * (1<<SCALE_BITS)),
+        (int) ((size1D - 1) / 255.0 * (1<<SCALE_BITS)));
     __m256i scale_mask256 = _mm256_set1_epi16(SCALE_MASK >> 8);
     __m256i index_mul256 = _mm256_set_epi16(
         0, size1D_2D*table_channels, size1D*table_channels, table_channels,
