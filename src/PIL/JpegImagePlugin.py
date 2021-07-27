@@ -33,7 +33,6 @@
 #
 import array
 import io
-import math
 import os
 import struct
 import subprocess
@@ -162,13 +161,15 @@ def APP(self, marker):
                 dpi = float(x_resolution[0]) / x_resolution[1]
             except TypeError:
                 dpi = x_resolution
-            if math.isnan(dpi):
-                raise ValueError
+
+            # Check dpi is a number
+            int(dpi)
+
             if resolution_unit == 3:  # cm
                 # 1 dpcm = 2.54 dpi
                 dpi *= 2.54
             self.info["dpi"] = dpi, dpi
-        except (TypeError, KeyError, SyntaxError, ValueError, ZeroDivisionError):
+        except (KeyError, SyntaxError, ValueError, ZeroDivisionError):
             # SyntaxError for invalid/unreadable EXIF
             # KeyError for dpi not included
             # ZeroDivisionError for invalid dpi rational value
