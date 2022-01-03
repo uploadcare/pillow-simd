@@ -1,5 +1,9 @@
 /* Microsoft compiler doesn't limit intrinsics for an architecture.
    This macro is set only on x86 and means SSE2 and above including AVX2. */
+
+#ifndef __IMAGING_SIMD_H__
+#define __IMAGING_SIMD_H__
+   
 #if defined(_M_X64) || _M_IX86_FP == 2
     #define __SSE4_2__
 #endif
@@ -24,4 +28,6 @@ static __m256i inline
 mm256_cvtepu8_epi32(void *ptr) {
     return _mm256_cvtepu8_epi32(_mm_loadl_epi64((__m128i *) ptr));
 }
+#endif
+
 #endif
