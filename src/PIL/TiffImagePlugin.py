@@ -1295,12 +1295,7 @@ class TiffImageFile(ImageFile.ImageFile):
         bps_tuple = self.tag_v2.get(BITSPERSAMPLE, (1,))
         expected_bps_size = self.tag_v2.get(SAMPLESPERPIXEL)
         if expected_bps_size and expected_bps_size != len(bps_tuple):
-            if DEBUG:
-                print(
-                    "! SAMPLESPERPIXEL and BITSPERSAMPLE mismatch",
-                    bps_tuple,
-                    expected_bps_size
-                )
+            logger.debug(f"SAMPLESPERPIXEL and BITSPERSAMPLE mismatch {bps_tuple} {expected_bps_size}")
             bps_tuple = bps_tuple[expected_bps_size:]
         extra_tuple = self.tag_v2.get(EXTRASAMPLES, ())
         if photo in (2, 6, 8):  # RGB, YCbCr, LAB
