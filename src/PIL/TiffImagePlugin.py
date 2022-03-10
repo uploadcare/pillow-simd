@@ -1231,6 +1231,13 @@ class TiffImageFile(ImageFile.ImageFile):
         # while should have more. Or have more values
         # than expected. Fix it
         bps_actual_count = len(bps_tuple)
+        samples_per_pixel = self.tag_v2.get(SAMPLESPERPIXEL, bps_count)
+        if samples_per_pixel != bps_count:
+            # libtiff uses SAMPLESPERPIXEL to determine buffer size, so it should
+            # trump previous calculations.
+            if DEBUG:
+                print("SAMPLESPERPIXEL does not match inferred: {samples_per_pixel} vs {bps_count}")
+            bps_count = samples_per_pixel
         if bps_count < bps_actual_count:
             bps_tuple = bps_tuple[:bps_count]
         elif bps_count > bps_actual_count and bps_actual_count == 1:
