@@ -1236,7 +1236,7 @@ class TiffImageFile(ImageFile.ImageFile):
             # libtiff uses SAMPLESPERPIXEL to determine buffer size, so it should
             # trump previous calculations.
             if DEBUG:
-                print("SAMPLESPERPIXEL does not match inferred: {samples_per_pixel} vs {bps_count}")
+                print(f"SAMPLESPERPIXEL does not match inferred: {samples_per_pixel} vs {bps_count}")
             bps_count = samples_per_pixel
         if bps_count < bps_actual_count:
             bps_tuple = bps_tuple[:bps_count]
