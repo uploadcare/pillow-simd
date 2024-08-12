@@ -784,13 +784,13 @@ static PyMethodDef webpMethods[] = {
 
 static int
 setup_module(PyObject *m) {
-    PyObject *d = PyModule_GetDict(m);
     /* Ready object types */
     if (PyType_Ready(&WebPAnimDecoder_Type) < 0 ||
         PyType_Ready(&WebPAnimEncoder_Type) < 0) {
         return -1;
     }
 
+    PyObject *d = PyModule_GetDict(m);
     PyObject *v = PyUnicode_FromString(WebPDecoderVersion_str());
     PyDict_SetItemString(d, "webpdecoder_version", v ? v : Py_None);
     Py_XDECREF(v);
