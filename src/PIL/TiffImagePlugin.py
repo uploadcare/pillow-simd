@@ -1416,7 +1416,7 @@ class TiffImageFile(ImageFile.ImageFile):
             self.fp.close()
             self.fp = None  # might be shared
 
-        if err < 0:
+        if not ImageFile.LOAD_TRUNCATED_IMAGES and err < 0:
             msg = f"decoder error {err}"
             raise OSError(msg)
 
