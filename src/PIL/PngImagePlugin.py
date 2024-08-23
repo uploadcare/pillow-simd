@@ -1052,16 +1052,21 @@ class PngImageFile(ImageFile.ImageFile):
                     length -= 4
                 try:
                     ImageFile._safe_read(self.fp, length)
-                except OSError as e:
+                except OSError:
                     if ImageFile.LOAD_TRUNCATED_IMAGES:
                         break
-                    else:
-                        raise e
+                    raise
             except AttributeError:
                 logger.debug("%r %s %s (unknown)", cid, pos, length)
-                s = ImageFile._safe_read(self.fp, length)
-                if cid[1:2].islower():
-                    self.private_chunks.append((cid, s, True))
+                try:
+                    s = ImageFile._safe_read(self.fp, length)
+                except OSError:
+                    if ImageFile.LOAD_TRUNCATED_IMAGES:
+                        break
+                    raise
+                else:
+                    if cid[1:2].islower():
+                        self.private_chunks.append((cid, s, True))
         self._text = self.png.im_text
         if not self.is_animated:
             self.png.close()
