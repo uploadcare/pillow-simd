@@ -61,10 +61,9 @@ ImagingFind(const char *name) {
     const char *expected = "capsule object \"" IMAGING_MAGIC "\" at 0x";
 
     if (name[0] == '<') {
+        // Unless PyPy is in use, the PyCapsule is converted to a string representation
         name++;
     } else {
-        // Special case for PyPy, where the string representation of a Capsule
-        // refers directly to the pointer itself, not to the PyCapsule object.
         direct_pointer = 1;
     }
 
