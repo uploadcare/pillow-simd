@@ -626,6 +626,9 @@ def test_constants_deprecation():
             with pytest.warns(DeprecationWarning):
                 assert getattr(ImageCms, prefix + name) == enum[name]
 
+def test_long_modes() -> None:
+    p = ImageCms.getOpenProfile("Tests/icc/sGrey-v2-nano.icc")
+    ImageCms.buildTransform(p, p, "ABCDEFGHI", "ABCDEFGHI")
 
 @pytest.mark.parametrize("mode", ("RGB", "RGBA", "RGBX"))
 def test_rgb_lab(mode):
