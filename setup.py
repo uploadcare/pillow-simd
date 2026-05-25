@@ -10,9 +10,11 @@
 
 import os
 import re
+import platform as _platform
 import struct
 import subprocess
 import sys
+import sysconfig
 import warnings
 
 from setuptools import Extension, setup
@@ -241,6 +243,89 @@ def _find_include_dir(self, dirname, include):
         if os.path.isfile(os.path.join(subdir, include)):
             _dbg("Found %s in %s", (include, subdir))
             return subdir
+
+
+def _is_riscv64_cross_build():
+    return _target_machine() == "riscv64" and _platform.machine() != "riscv64"
+
+
+def _host_multiarch_names():
+    names = set()
+    machine = _platform.machine().lower()
+    machine_map = {
+        "amd64": "x86_64-linux-gnu",
+        "x86_64": "x86_64-linux-gnu",
+        "i386": "i386-linux-gnu",
+        "i686": "i386-linux-gnu",
+        "aarch64": "aarch64-linux-gnu",
+        "arm64": "aarch64-linux-gnu",
+        "ppc64le": "powerpc64le-linux-gnu",
+        "s390x": "s390x-linux-gnu",
+    }
+    if machine in machine_map:
+        host_multiarch = machine_map[machine]
+        names.add(host_multiarch)
+
+        multiarch = sysconfig.get_config_var("MULTIARCH")
+        if multiarch == host_multiarch:
+            names.add(multiarch)
+    return names
+
+
+def _is_host_multiarch_path(path, kind):
+    if not path:
+        return False
+
+    parts = os.path.realpath(path).split(os.sep)
+    host_multiarch_names = _host_multiarch_names()
+    if not host_multiarch_names.intersection(parts):
+        return False
+
+    roots = {
+        "include": {
+            os.path.realpath("/usr/include"),
+            os.path.realpath("/usr/local/include"),
+        },
+        "library": {
+            os.path.realpath("/lib"),
+            os.path.realpath("/usr/lib"),
+            os.path.realpath("/usr/local/lib"),
+        },
+    }[kind]
+    real_path = os.path.realpath(path)
+    return any(
+        real_path == root or real_path.startswith(root + os.sep)
+        for root in roots
+    )
+
+
+def _filter_cross_build_paths(paths, kind):
+    if not _is_riscv64_cross_build():
+        return paths
+
+    blocked = {
+        "include": {
+            os.path.realpath("/usr/include"),
+            os.path.realpath("/usr/local/include"),
+            os.path.realpath(os.path.join(sys.prefix, "include")),
+            os.path.realpath(sysconfig.get_path("include") or ""),
+            os.path.realpath(sysconfig.get_path("platinclude") or ""),
+        },
+        "library": {
+            os.path.realpath("/lib"),
+            os.path.realpath("/usr/lib"),
+            os.path.realpath("/usr/local/lib"),
+            os.path.realpath(os.path.join(sys.prefix, "lib")),
+        },
+    }[kind]
+
+    return [
+        path for path in paths
+        if (
+            os.path.realpath(path) not in blocked
+            and not _is_host_multiarch_path(path, kind)
+        )
+    ]
 
 
 def _cmd_exists(cmd: str) -> bool:
@@ -626,6 +711,15 @@ class pil_build_ext(build_ext):
         # insert new dirs *before* default libs, to avoid conflicts
         # between Python PYD stub libs and real libraries
 
+        include_dirs = _filter_cross_build_paths(include_dirs, "include")
+        library_dirs = _filter_cross_build_paths(library_dirs, "library")
+        self.compiler.include_dirs = _filter_cross_build_paths(
+            self.compiler.include_dirs, "include"
+        )
+        self.compiler.library_dirs = _filter_cross_build_paths(
+            self.compiler.library_dirs, "library"
+        )
+
         self.compiler.library_dirs = library_dirs + self.compiler.library_dirs
         self.compiler.include_dirs = include_dirs + self.compiler.include_dirs
 
@@ -975,13 +1069,56 @@ def debug_build():
     return hasattr(sys, "gettotalrefcount") or FUZZING_BUILD
 
 
+def _target_machine():
+    target_context = []
+    for env_name in (
+        "CC",
+        "CXX",
+        "CFLAGS",
+        "CPPFLAGS",
+        "CXXFLAGS",
+        "LDFLAGS",
+        "_PYTHON_HOST_PLATFORM",
+    ):
+        target_context.append(os.environ.get(env_name, ""))
+    for config_name in ("CC", "CXX", "CFLAGS", "CPPFLAGS", "CXXFLAGS", "LDFLAGS"):
+        target_context.append(sysconfig.get_config_var(config_name) or "")
+    target_context.extend(sys.argv)
+    machine = _platform.machine()
+
+    for value in target_context:
+        if "riscv64" in value.lower():
+            return "riscv64"
+
+    return machine
+
+
+def _has_riscv_target_arg():
+    for env_name in ("CFLAGS", "CPPFLAGS", "CXXFLAGS", "CC", "CXX"):
+        value = os.environ.get(env_name, "")
+        if "-mcpu=" in value or "-march=" in value:
+            return True
+    return False
+
+
 files = ["src/_imaging.c"]
 for src_file in _IMAGING:
     files.append("src/" + src_file + ".c")
 for src_file in _LIB_IMAGING:
     files.append(os.path.join("src/libImaging", src_file + ".c"))
+_machine = _target_machine()
+if _machine in ('x86_64', 'AMD64', 'i686', 'x86'):
+    _simd_compile_args = ["-msse4"]
+elif _machine == 'riscv64':
+    # Keep the default target runnable on baseline riscv64 systems.  RVV code
+    # is enabled when the caller explicitly supplies a vector-capable target.
+    _riscv_target_args = [] if _has_riscv_target_arg() else ["-march=rv64gc"]
+    _simd_compile_args = _riscv_target_args[:]
+else:
+    _simd_compile_args = []
+
 ext_modules = [
-    Extension("PIL._imaging", files, extra_compile_args=["-msse4"]),
+    Extension("PIL._imaging", files, extra_compile_args=_simd_compile_args),
     Extension("PIL._imagingft", ["src/_imagingft.c"]),
     Extension("PIL._imagingcms", ["src/_imagingcms.c"]),
     Extension("PIL._webp", ["src/_webp.c"]),

@@ -77,7 +77,7 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
             MM_KERNEL_SUM(ss0, 0, _mm256_unpacklo_epi8, 0, 0x00);
             MM_KERNEL_SUM(ss0, 0, _mm256_unpackhi_epi8, 0, 0x55);
             MM_KERNEL_SUM(ss2, 0, _mm256_unpackhi_epi8, 0, 0x00);
-            
+
             MM_KERNEL_LOAD(1, x+2);
             MM_KERNEL_SUM(ss0, 1, _mm256_unpacklo_epi8, 0, 0xaa);
             ss0 = _mm256_srai_epi32(ss0, PRECISION_BITS);
@@ -128,7 +128,7 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
     #undef MM_KERNEL_LOAD
     #undef MM_KERNEL_SUM
 
-#else
+#elif defined(__SSE4_2__)
 
     #define MM_KERNEL_LOAD(row, x) \
         pix0##row = _mm_shuffle_epi8(_mm_loadu_si128((__m128i*) &in2[x]), shuffle); \
@@ -194,7 +194,7 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
             MM_KERNEL_SUM(ss1, 0, _mm_unpackhi_epi8, 1, 0x55);
             MM_KERNEL_SUM(ss2, 0, _mm_unpackhi_epi8, 0, 0x00);
             MM_KERNEL_SUM(ss3, 0, _mm_unpackhi_epi8, 1, 0x00);
-            
+
             MM_KERNEL_LOAD(1, x+2);
             MM_KERNEL_SUM(ss0, 1, _mm_unpacklo_epi8, 0, 0xaa);
             ss0 = _mm_srai_epi32(ss0, PRECISION_BITS);
@@ -242,6 +242,119 @@ ImagingFilter5x5i_4u8(Imaging imOut, Imaging im, const INT16* kernel,
         out[x+1] = in0[x+1];
     #undef MM_KERNEL_LOAD
     #undef MM_KERNEL_SUM
+
+#elif defined(__riscv_vector)
+
+        out[0] = in0[0];
+        out[1] = in0[1];
+        {
+            INT32* rows[5] = {in2, in1, in0, in_1, in_2};
+            int npixels = im->xsize - 4;
+            x = 2;
+            for (int done = 0; done < npixels; ) {
+                size_t vl = __riscv_vsetvl_e32m4(npixels - done);
+
+                vint32m4_t accR = __riscv_vmv_v_x_i32m4(offset, vl);
+                vint32m4_t accG = __riscv_vmv_v_x_i32m4(offset, vl);
+                vint32m4_t accB = __riscv_vmv_v_x_i32m4(offset, vl);
+                vint32m4_t accA = __riscv_vmv_v_x_i32m4(offset, vl);
+
+                int ky, kx;
+                for (ky = 0; ky < 5; ky++) {
+                    for (kx = 0; kx < 5; kx++) {
+                        UINT8* base = (UINT8*)&rows[ky][x - 2 + kx];
+                        INT32 kval = (INT32)kernel[ky * 5 + kx];
+                        vuint8m1_t vr, vg, vb, va;
+                        RVV_VLSEG4E8_U8M1(vr, vg, vb, va, (const uint8_t*)base, vl);
+
+                        vuint16m2_t wr = __riscv_vzext_vf2_u16m2(vr, vl);
+                        vuint32m4_t dr = __riscv_vzext_vf2_u32m4(wr, vl);
+                        vint32m4_t sr = __riscv_vreinterpret_v_u32m4_i32m4(dr);
+                        accR = __riscv_vmacc_vx_i32m4(accR, kval, sr, vl);
+
+                        vuint16m2_t wg = __riscv_vzext_vf2_u16m2(vg, vl);
+                        vuint32m4_t dg = __riscv_vzext_vf2_u32m4(wg, vl);
+                        vint32m4_t sg = __riscv_vreinterpret_v_u32m4_i32m4(dg);
+                        accG = __riscv_vmacc_vx_i32m4(accG, kval, sg, vl);
+
+                        vuint16m2_t wb = __riscv_vzext_vf2_u16m2(vb, vl);
+                        vuint32m4_t db = __riscv_vzext_vf2_u32m4(wb, vl);
+                        vint32m4_t sb = __riscv_vreinterpret_v_u32m4_i32m4(db);
+                        accB = __riscv_vmacc_vx_i32m4(accB, kval, sb, vl);
+
+                        vuint16m2_t wa = __riscv_vzext_vf2_u16m2(va, vl);
+                        vuint32m4_t da = __riscv_vzext_vf2_u32m4(wa, vl);
+                        vint32m4_t sa = __riscv_vreinterpret_v_u32m4_i32m4(da);
+                        accA = __riscv_vmacc_vx_i32m4(accA, kval, sa, vl);
+                    }
+                }
+
+                /* Shift right by PRECISION_BITS */
+                accR = __riscv_vsra_vx_i32m4(accR, PRECISION_BITS, vl);
+                accG = __riscv_vsra_vx_i32m4(accG, PRECISION_BITS, vl);
+                accB = __riscv_vsra_vx_i32m4(accB, PRECISION_BITS, vl);
+                accA = __riscv_vsra_vx_i32m4(accA, PRECISION_BITS, vl);
+
+                /* Clamp to [0, 255] */
+                vint32m4_t zero = __riscv_vmv_v_x_i32m4(0, vl);
+                vint32m4_t max255 = __riscv_vmv_v_x_i32m4(255, vl);
+                accR = __riscv_vmax_vv_i32m4(accR, zero, vl);
+                accR = __riscv_vmin_vv_i32m4(accR, max255, vl);
+                accG = __riscv_vmax_vv_i32m4(accG, zero, vl);
+                accG = __riscv_vmin_vv_i32m4(accG, max255, vl);
+                accB = __riscv_vmax_vv_i32m4(accB, zero, vl);
+                accB = __riscv_vmin_vv_i32m4(accB, max255, vl);
+                accA = __riscv_vmax_vv_i32m4(accA, zero, vl);
+                accA = __riscv_vmin_vv_i32m4(accA, max255, vl);
+
+                /* Narrow i32 -> u16 -> u8 and interleave-store */
+                vuint32m4_t uR = __riscv_vreinterpret_v_i32m4_u32m4(accR);
+                vuint32m4_t uG = __riscv_vreinterpret_v_i32m4_u32m4(accG);
+                vuint32m4_t uB = __riscv_vreinterpret_v_i32m4_u32m4(accB);
+                vuint32m4_t uA = __riscv_vreinterpret_v_i32m4_u32m4(accA);
+
+                vuint16m2_t nR16 = RVV_VNCLIPU(u16m2, uR, 0, vl);
+                vuint8m1_t  nR8  = RVV_VNCLIPU(u8m1, nR16, 0, vl);
+                vuint16m2_t nG16 = RVV_VNCLIPU(u16m2, uG, 0, vl);
+                vuint8m1_t  nG8  = RVV_VNCLIPU(u8m1, nG16, 0, vl);
+                vuint16m2_t nB16 = RVV_VNCLIPU(u16m2, uB, 0, vl);
+                vuint8m1_t  nB8  = RVV_VNCLIPU(u8m1, nB16, 0, vl);
+                vuint16m2_t nA16 = RVV_VNCLIPU(u16m2, uA, 0, vl);
+                vuint8m1_t  nA8  = RVV_VNCLIPU(u8m1, nA16, 0, vl);
+
+                RVV_VSSEG4E8_U8M1((UINT8*)&out[x], nR8, nG8, nB8, nA8, vl);
+
+                x += vl;
+                done += vl;
+            }
+        }
+        out[im->xsize - 2] = in0[im->xsize - 2];
+        out[im->xsize - 1] = in0[im->xsize - 1];
+
+#else /* scalar fallback */
+
+        out[0] = in0[0];
+        out[1] = in0[1];
+        for (x = 2; x < im->xsize-2; x++) {
+            int ch;
+            UINT8* pOut = (UINT8*)&out[x];
+            INT32* rows[5] = {in2, in1, in0, in_1, in_2};
+            for (ch = 0; ch < 4; ch++) {
+                INT32 ss = offset;
+                int ky, kx;
+                for (ky = 0; ky < 5; ky++) {
+                    for (kx = 0; kx < 5; kx++) {
+                        ss += ((UINT8*)&rows[ky][x - 2 + kx])[ch] * kernel[ky * 5 + kx];
+                    }
+                }
+                ss >>= PRECISION_BITS;
+                if (ss < 0) ss = 0;
+                if (ss > 255) ss = 255;
+                pOut[ch] = (UINT8)ss;
+            }
+        }
+        out[x] = in0[x];
+        out[x+1] = in0[x+1];
 
 #endif
     }

@@ -21,7 +21,6 @@ Imaging
 ImagingGetBand(Imaging imIn, int band) {
     Imaging imOut;
     int x, y;
-    __m128i shuffle_mask;
 
     /* Check arguments */
     if (!imIn || imIn->type != IMAGING_TYPE_UINT8) {
@@ -47,20 +46,32 @@ ImagingGetBand(Imaging imIn, int band) {
         return NULL;
     }
 
-    shuffle_mask = _mm_set_epi8(
+#if defined(__SSE4_2__)
+    __m128i shuffle_mask = _mm_set_epi8(
         -1,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1, 12+band,8+band,4+band,0+band);
+#endif
 
     /* Extract band from image */
     for (y = 0; y < imIn->ysize; y++) {
         UINT8* in = (UINT8*) imIn->image[y];
         UINT8* out = imOut->image8[y];
         x = 0;
+#if defined(__SSE4_2__)
         for (; x < imIn->xsize - 3; x += 4) {
             __m128i source = _mm_loadu_si128((__m128i *) in);
             *((UINT32*) (out + x)) = _mm_cvtsi128_si32(
                 _mm_shuffle_epi8(source, shuffle_mask));
             in += 16;
         }
+#elif defined(__riscv_vector)
+        for (; x < imIn->xsize; ) {
+            size_t vl = __riscv_vsetvl_e8m1(imIn->xsize - x);
+            vuint8m1_t v = __riscv_vlse8_v_u8m1(in + band, 4, vl);
+            __riscv_vse8_v_u8m1(out + x, v, vl);
+            in += vl * 4;
+            x += vl;
+        }
+#endif
         for (; x < imIn->xsize; x++) {
             out[x] = *(in + band);
             in += 4;
@@ -103,6 +114,7 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             UINT8 *out0 = bands[0]->image8[y];
             UINT8 *out1 = bands[1]->image8[y];
             x = 0;
+#if defined(__SSE4_2__)
             for (; x < imIn->xsize - 3; x += 4) {
                 __m128i source = _mm_loadu_si128((__m128i *) in);
                 source = _mm_shuffle_epi8(source, _mm_set_epi8(
@@ -112,6 +124,17 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
                     _mm_srli_si128(source, 12));
                 in += 16;
             }
+#elif defined(__riscv_vector)
+            for (; x < imIn->xsize; ) {
+                size_t vl = __riscv_vsetvl_e8m1(imIn->xsize - x);
+                vuint8m1_t v0 = __riscv_vlse8_v_u8m1(in + 0, 4, vl);
+                vuint8m1_t v3 = __riscv_vlse8_v_u8m1(in + 3, 4, vl);
+                __riscv_vse8_v_u8m1(out0 + x, v0, vl);
+                __riscv_vse8_v_u8m1(out1 + x, v3, vl);
+                in += vl * 4;
+                x += vl;
+            }
+#endif
             for (; x < imIn->xsize; x++) {
                 out0[x] = in[0];
                 out1[x] = in[3];
@@ -125,6 +148,7 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             UINT8 *out1 = bands[1]->image8[y];
             UINT8 *out2 = bands[2]->image8[y];
             x = 0;
+#if defined(__SSE4_2__)
             for (; x < imIn->xsize - 3; x += 4) {
                 __m128i source = _mm_loadu_si128((__m128i *) in);
                 source = _mm_shuffle_epi8(source, _mm_set_epi8(
@@ -136,6 +160,19 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
                     _mm_srli_si128(source, 8));
                 in += 16;
             }
+#elif defined(__riscv_vector)
+            for (; x < imIn->xsize; ) {
+                size_t vl = __riscv_vsetvl_e8m1(imIn->xsize - x);
+                vuint8m1_t v0 = __riscv_vlse8_v_u8m1(in + 0, 4, vl);
+                vuint8m1_t v1 = __riscv_vlse8_v_u8m1(in + 1, 4, vl);
+                vuint8m1_t v2 = __riscv_vlse8_v_u8m1(in + 2, 4, vl);
+                __riscv_vse8_v_u8m1(out0 + x, v0, vl);
+                __riscv_vse8_v_u8m1(out1 + x, v1, vl);
+                __riscv_vse8_v_u8m1(out2 + x, v2, vl);
+                in += vl * 4;
+                x += vl;
+            }
+#endif
             for (; x < imIn->xsize; x++) {
                 out0[x] = in[0];
                 out1[x] = in[1];
@@ -151,6 +188,7 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             UINT8 *out2 = bands[2]->image8[y];
             UINT8 *out3 = bands[3]->image8[y];
             x = 0;
+#if defined(__SSE4_2__)
             for (; x < imIn->xsize - 3; x += 4) {
                 __m128i source = _mm_loadu_si128((__m128i *) in);
                 source = _mm_shuffle_epi8(source, _mm_set_epi8(
@@ -164,6 +202,21 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
                     _mm_srli_si128(source, 12));
                 in += 16;
             }
+#elif defined(__riscv_vector)
+            for (; x < imIn->xsize; ) {
+                size_t vl = __riscv_vsetvl_e8m1(imIn->xsize - x);
+                vuint8m1_t v0 = __riscv_vlse8_v_u8m1(in + 0, 4, vl);
+                vuint8m1_t v1 = __riscv_vlse8_v_u8m1(in + 1, 4, vl);
+                vuint8m1_t v2 = __riscv_vlse8_v_u8m1(in + 2, 4, vl);
+                vuint8m1_t v3 = __riscv_vlse8_v_u8m1(in + 3, 4, vl);
+                __riscv_vse8_v_u8m1(out0 + x, v0, vl);
+                __riscv_vse8_v_u8m1(out1 + x, v1, vl);
+                __riscv_vse8_v_u8m1(out2 + x, v2, vl);
+                __riscv_vse8_v_u8m1(out3 + x, v3, vl);
+                in += vl * 4;
+                x += vl;
+            }
+#endif
             for (; x < imIn->xsize; x++) {
                 out0[x] = in[0];
                 out1[x] = in[1];

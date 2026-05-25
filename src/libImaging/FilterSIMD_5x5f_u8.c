@@ -2,6 +2,10 @@ void
 ImagingFilter5x5f_u8(Imaging imOut, Imaging im, const float* kernel,
                      float offset)
 {
+    int x, y;
+
+#if defined(__SSE4_2__)
+
 #define MM_KERNEL1x5_LOAD(row, x) \
     pix0##row = _mm_cvtepi32_ps(mm_cvtepu8_epi32(&in2[x])); \
     pix1##row = _mm_cvtepi32_ps(mm_cvtepu8_epi32(&in1[x])); \
@@ -15,8 +19,6 @@ ImagingFilter5x5f_u8(Imaging imOut, Imaging im, const float* kernel,
     ss = _mm_add_ps(ss, _mm_mul_ps(pix2##row, kernel2##krow)); \
     ss = _mm_add_ps(ss, _mm_mul_ps(pix3##row, kernel3##krow)); \
     ss = _mm_add_ps(ss, _mm_mul_ps(pix4##row, kernel4##krow));
-
-    int x, y;
 
     memcpy(imOut->image8[0], im->image8[0], im->linesize);
     memcpy(imOut->image8[1], im->image8[1], im->linesize);
@@ -97,4 +99,88 @@ ImagingFilter5x5f_u8(Imaging imOut, Imaging im, const float* kernel,
 
 #undef MM_KERNEL1x5_LOAD
 #undef MM_KERNEL1x5_SUM
+
+#elif defined(__riscv_vector)
+
+    memcpy(imOut->image8[0], im->image8[0], im->linesize);
+    memcpy(imOut->image8[1], im->image8[1], im->linesize);
+    for (y = 2; y < im->ysize-2; y++) {
+        UINT8* in_2 = im->image8[y-2];
+        UINT8* in_1 = im->image8[y-1];
+        UINT8* in0 = im->image8[y];
+        UINT8* in1 = im->image8[y+1];
+        UINT8* in2 = im->image8[y+2];
+        UINT8* out = imOut->image8[y];
+        UINT8* rows[5] = {in2, in1, in0, in_1, in_2};
+
+        out[0] = in0[0];
+        out[1] = in0[1];
+        int npixels = im->xsize - 4; /* number of interior pixels */
+        x = 2;
+        for (int done = 0; done < npixels; ) {
+            size_t vl = __riscv_vsetvl_e32m4(npixels - done);
+
+            vfloat32m4_t acc = __riscv_vfmv_v_f_f32m4(offset, vl);
+
+            int ky, kx;
+            for (ky = 0; ky < 5; ky++) {
+                for (kx = 0; kx < 5; kx++) {
+                    vuint8m1_t raw = __riscv_vle8_v_u8m1(&rows[ky][x - 2 + kx], vl);
+                    vuint16m2_t w16 = __riscv_vzext_vf2_u16m2(raw, vl);
+                    vuint32m4_t w32 = __riscv_vzext_vf2_u32m4(w16, vl);
+                    vfloat32m4_t fp = __riscv_vfcvt_f_xu_v_f32m4(w32, vl);
+                    acc = __riscv_vfmacc_vf_f32m4(acc, kernel[ky * 5 + kx], fp, vl);
+                }
+            }
+
+            /* Convert f32 -> u32, narrow to u8 with saturation */
+            vuint32m4_t ures = __riscv_vfcvt_xu_f_v_u32m4(acc, vl);
+            vuint16m2_t n16 = RVV_VNCLIPU(u16m2, ures, 0, vl);
+            vuint8m1_t n8 = RVV_VNCLIPU(u8m1, n16, 0, vl);
+            __riscv_vse8_v_u8m1(&out[x], n8, vl);
+
+            x += vl;
+            done += vl;
+        }
+        out[im->xsize - 2] = in0[im->xsize - 2];
+        out[im->xsize - 1] = in0[im->xsize - 1];
+    }
+    memcpy(imOut->image8[y], im->image8[y], im->linesize);
+    memcpy(imOut->image8[y+1], im->image8[y+1], im->linesize);
+
+#else /* scalar fallback */
+
+    memcpy(imOut->image8[0], im->image8[0], im->linesize);
+    memcpy(imOut->image8[1], im->image8[1], im->linesize);
+    for (y = 2; y < im->ysize-2; y++) {
+        UINT8* in_2 = im->image8[y-2];
+        UINT8* in_1 = im->image8[y-1];
+        UINT8* in0 = im->image8[y];
+        UINT8* in1 = im->image8[y+1];
+        UINT8* in2 = im->image8[y+2];
+        UINT8* out = imOut->image8[y];
+
+        out[0] = in0[0];
+        out[1] = in0[1];
+        for (x = 2; x < im->xsize-2; x++) {
+            float sum = offset;
+            int ky, kx;
+            UINT8* rows[5] = {in2, in1, in0, in_1, in_2};
+            for (ky = 0; ky < 5; ky++) {
+                for (kx = 0; kx < 5; kx++) {
+                    sum += (float)rows[ky][x - 2 + kx] * kernel[ky * 5 + kx];
+                }
+            }
+            int val = (int)(sum + 0.5f);
+            if (val < 0) val = 0;
+            if (val > 255) val = 255;
+            out[x] = (UINT8)val;
+        }
+        out[x+0] = in0[x+0];
+        out[x+1] = in0[x+1];
+    }
+    memcpy(imOut->image8[y], im->image8[y], im->linesize);
+    memcpy(imOut->image8[y+1], im->image8[y+1], im->linesize);
+
+#endif
 }

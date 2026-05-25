@@ -103,6 +103,45 @@ bit2hsv(UINT8 *out, const UINT8 *in, int xsize) {
 /* RGB/L conversions */
 /* ----------------- */
 
+#if defined(__riscv_vector)
+static inline void
+rvv_l_to_rgba(UINT8 *out, const UINT8 *in, int xsize) {
+    int x = 0;
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e8m1(xsize - x);
+        vuint8m1_t v = __riscv_vle8_v_u8m1(&in[x], vl);
+        vuint8m1_t a = __riscv_vmv_v_x_u8m1(255, vl);
+        RVV_VSSEG4E8_U8M1(&out[x * 4], v, v, v, a, vl);
+        x += vl;
+    }
+}
+
+static inline void
+rvv_la_to_rgba(UINT8 *out, const UINT8 *in, int xsize) {
+    int x = 0;
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e8m1(xsize - x);
+        vuint8m1_t v = __riscv_vlse8_v_u8m1(&in[x * 4], 4, vl);
+        vuint8m1_t a = __riscv_vlse8_v_u8m1(&in[x * 4 + 3], 4, vl);
+        RVV_VSSEG4E8_U8M1(&out[x * 4], v, v, v, a, vl);
+        x += vl;
+    }
+}
+
+static inline void
+rvv_rgba_to_rgb(UINT8 *out, const UINT8 *in, int xsize) {
+    int x = 0;
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e8m1(xsize - x);
+        vuint8m1_t r, g, b, a;
+        RVV_VLSEG4E8_U8M1(r, g, b, a, &in[x * 4], vl);
+        a = __riscv_vmv_v_x_u8m1(255, vl);
+        RVV_VSSEG4E8_U8M1(&out[x * 4], r, g, b, a, vl);
+        x += vl;
+    }
+}
+#endif
+
 static void
 l2bit(UINT8 *out, const UINT8 *in, int xsize) {
     int x;
@@ -147,6 +186,9 @@ la2lA(UINT8 *out, const UINT8 *in, int xsize) {
 
 static void
 l2la(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(__riscv_vector)
+    rvv_l_to_rgba(out, in, xsize);
+#else
     int x;
     for (x = 0; x < xsize; x++) {
         UINT8 v = *in++;
@@ -155,10 +197,14 @@ l2la(UINT8 *out, const UINT8 *in, int xsize) {
         *out++ = v;
         *out++ = 255;
     }
+#endif
 }
 
 static void
 l2rgb(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(__riscv_vector)
+    rvv_l_to_rgba(out, in, xsize);
+#else
     int x;
     for (x = 0; x < xsize; x++) {
         UINT8 v = *in++;
@@ -167,6 +213,7 @@ l2rgb(UINT8 *out, const UINT8 *in, int xsize) {
         *out++ = v;
         *out++ = 255;
     }
+#endif
 }
 
 static void
@@ -183,14 +230,27 @@ l2hsv(UINT8 *out, const UINT8 *in, int xsize) {
 
 static void
 la2l(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(__riscv_vector)
+    int x = 0;
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e8m1(xsize - x);
+        vuint8m1_t v = __riscv_vlse8_v_u8m1(&in[x * 4], 4, vl);
+        __riscv_vse8_v_u8m1(&out[x], v, vl);
+        x += vl;
+    }
+#else
     int x;
     for (x = 0; x < xsize; x++, in += 4) {
         *out++ = in[0];
     }
+#endif
 }
 
 static void
 la2rgb(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(__riscv_vector)
+    rvv_la_to_rgba(out, in, xsize);
+#else
     int x;
     for (x = 0; x < xsize; x++, in += 4) {
         UINT8 v = in[0];
@@ -199,6 +259,7 @@ la2rgb(UINT8 *out, const UINT8 *in, int xsize) {
         *out++ = v;
         *out++ = in[3];
     }
+#endif
 }
 
 static void
@@ -226,6 +287,7 @@ static void
 rgb2l(UINT8* out, const UINT8* in, int xsize)
 {
     int x = 0;
+#if defined(__SSE4_2__)
     __m128i coeff = _mm_set_epi16(
         0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
     for (; x < xsize - 3; x += 4, in += 16) {
@@ -242,6 +304,33 @@ rgb2l(UINT8* out, const UINT8* in, int xsize)
         pix0 = _mm_packus_epi16(pix0, pix0);
         *(UINT32*)&out[x] = _mm_cvtsi128_si32(pix0);
     }
+#elif defined(__riscv_vector)
+    /* VL-agnostic: process N pixels at a time using RVV strided loads.
+       Luminance: L = (R*9798 + G*19235 + B*3735 + 0x4000) >> 15 */
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e32m2(xsize - x);
+        /* Load R, G, B channels with strided access (stride=4 bytes per pixel) */
+        vuint8mf2_t vr_u8 = __riscv_vlse8_v_u8mf2(&in[0], 4, vl);
+        vuint8mf2_t vg_u8 = __riscv_vlse8_v_u8mf2(&in[1], 4, vl);
+        vuint8mf2_t vb_u8 = __riscv_vlse8_v_u8mf2(&in[2], 4, vl);
+        /* Widen to u32 */
+        vuint32m2_t vr = __riscv_vzext_vf4_u32m2(vr_u8, vl);
+        vuint32m2_t vg = __riscv_vzext_vf4_u32m2(vg_u8, vl);
+        vuint32m2_t vb = __riscv_vzext_vf4_u32m2(vb_u8, vl);
+        /* Weighted sum */
+        vuint32m2_t lum = __riscv_vmul_vx_u32m2(vr, 9798, vl);
+        lum = __riscv_vmacc_vx_u32m2(lum, 19235, vg, vl);
+        lum = __riscv_vmacc_vx_u32m2(lum, 3735, vb, vl);
+        lum = __riscv_vadd_vx_u32m2(lum, 0x4000, vl);
+        lum = __riscv_vsrl_vx_u32m2(lum, 15, vl);
+        /* Narrow to u8 and store */
+        vuint16m1_t l16 = RVV_VNCLIPU(u16m1, lum, 0, vl);
+        vuint8mf2_t l8 = RVV_VNCLIPU(u8mf2, l16, 0, vl);
+        __riscv_vse8_v_u8mf2(&out[x], l8, vl);
+        x += vl;
+        in += vl * 4;
+    }
+#endif
     for (; x < xsize; x++, in += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
         out[x] = L24(in) >> 16;
@@ -252,6 +341,7 @@ static void
 rgb2la(UINT8* out, const UINT8* in, int xsize)
 {
     int x = 0;
+#if defined(__SSE4_2__)
     __m128i coeff = _mm_set_epi16(
         0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
     for (; x < xsize - 3; x += 4, in += 16, out += 16) {
@@ -269,6 +359,37 @@ rgb2la(UINT8* out, const UINT8* in, int xsize)
         pix0 = _mm_or_si128(pix0, _mm_set1_epi32(0xff000000));
         _mm_storeu_si128((__m128i*)out, pix0);
     }
+#elif defined(__riscv_vector)
+    /* VL-agnostic: process N pixels at a time.
+       Each output pixel: [L, L, L, 255] stored as u32. */
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e32m2(xsize - x);
+        /* Load R, G, B channels with strided access */
+        vuint8mf2_t vr_u8 = __riscv_vlse8_v_u8mf2(&in[0], 4, vl);
+        vuint8mf2_t vg_u8 = __riscv_vlse8_v_u8mf2(&in[1], 4, vl);
+        vuint8mf2_t vb_u8 = __riscv_vlse8_v_u8mf2(&in[2], 4, vl);
+        vuint32m2_t vr = __riscv_vzext_vf4_u32m2(vr_u8, vl);
+        vuint32m2_t vg = __riscv_vzext_vf4_u32m2(vg_u8, vl);
+        vuint32m2_t vb = __riscv_vzext_vf4_u32m2(vb_u8, vl);
+        /* Weighted sum */
+        vuint32m2_t lum = __riscv_vmul_vx_u32m2(vr, 9798, vl);
+        lum = __riscv_vmacc_vx_u32m2(lum, 19235, vg, vl);
+        lum = __riscv_vmacc_vx_u32m2(lum, 3735, vb, vl);
+        lum = __riscv_vadd_vx_u32m2(lum, 0x4000, vl);
+        lum = __riscv_vsrl_vx_u32m2(lum, 15, vl);
+        /* Broadcast L into R,G,B bytes, set alpha=255:
+           pixel = L | (L << 8) | (L << 16) | (0xFF << 24) */
+        vuint32m2_t l8 = __riscv_vsll_vx_u32m2(lum, 8, vl);
+        vuint32m2_t l16 = __riscv_vsll_vx_u32m2(lum, 16, vl);
+        vuint32m2_t result = __riscv_vor_vv_u32m2(lum, l8, vl);
+        result = __riscv_vor_vv_u32m2(result, l16, vl);
+        result = __riscv_vor_vx_u32m2(result, 0xFF000000, vl);
+        __riscv_vse32_v_u32m2((uint32_t *)out, result, vl);
+        x += vl;
+        in += vl * 4;
+        out += vl * 4;
+    }
+#endif
     for (; x < xsize; x++, in += 4, out += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
         out[0] = out[1] = out[2] = L24(in) >> 16;
@@ -281,6 +402,7 @@ rgb2i(UINT8* out_, const UINT8* in, int xsize)
 {
     int x = 0;
     INT32* out = (INT32*) out_;
+#if defined(__SSE4_2__)
     __m128i coeff = _mm_set_epi16(
         0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
     for (; x < xsize - 3; x += 4, in += 16, out += 4) {
@@ -295,6 +417,28 @@ rgb2i(UINT8* out_, const UINT8* in, int xsize)
         pix0 = _mm_srli_epi32(pix0, 15);
         _mm_storeu_si128((__m128i*)out, pix0);
     }
+#elif defined(__riscv_vector)
+    /* VL-agnostic: process N pixels at a time, store as INT32. */
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e32m2(xsize - x);
+        vuint8mf2_t vr_u8 = __riscv_vlse8_v_u8mf2(&in[0], 4, vl);
+        vuint8mf2_t vg_u8 = __riscv_vlse8_v_u8mf2(&in[1], 4, vl);
+        vuint8mf2_t vb_u8 = __riscv_vlse8_v_u8mf2(&in[2], 4, vl);
+        vuint32m2_t vr = __riscv_vzext_vf4_u32m2(vr_u8, vl);
+        vuint32m2_t vg = __riscv_vzext_vf4_u32m2(vg_u8, vl);
+        vuint32m2_t vb = __riscv_vzext_vf4_u32m2(vb_u8, vl);
+        vuint32m2_t lum = __riscv_vmul_vx_u32m2(vr, 9798, vl);
+        lum = __riscv_vmacc_vx_u32m2(lum, 19235, vg, vl);
+        lum = __riscv_vmacc_vx_u32m2(lum, 3735, vb, vl);
+        lum = __riscv_vadd_vx_u32m2(lum, 0x4000, vl);
+        lum = __riscv_vsrl_vx_u32m2(lum, 15, vl);
+        vint32m2_t result = __riscv_vreinterpret_v_u32m2_i32m2(lum);
+        __riscv_vse32_v_i32m2(out, result, vl);
+        x += vl;
+        in += vl * 4;
+        out += vl;
+    }
+#endif
     for (; x < xsize; x++, in += 4)
         *out++ = L24(in) >> 16;
 }
@@ -462,6 +606,9 @@ hsv2rgb(UINT8 *out, const UINT8 *in, int xsize) {  // following colorsys.py
 
 static void
 rgb2rgba(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(__riscv_vector)
+    rvv_rgba_to_rgb(out, in, xsize);
+#else
     int x;
     for (x = 0; x < xsize; x++) {
         *out++ = *in++;
@@ -470,12 +617,14 @@ rgb2rgba(UINT8 *out, const UINT8 *in, int xsize) {
         *out++ = 255;
         in++;
     }
+#endif
 }
 
 static void
 rgba2la(UINT8* out, const UINT8* in, int xsize)
 {
     int x = 0;
+#if defined(__SSE4_2__)
     __m128i coeff = _mm_set_epi16(
         0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
     for (; x < xsize - 3; x += 4, in += 16, out += 16) {
@@ -494,6 +643,39 @@ rgba2la(UINT8* out, const UINT8* in, int xsize)
         pix0 = _mm_or_si128(pix0, alpha);
         _mm_storeu_si128((__m128i*)out, pix0);
     }
+#elif defined(__riscv_vector)
+    /* VL-agnostic: process N RGBA pixels -> N LA pixels.
+       Each output pixel: [L, L, L, A] where L = luminance. */
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e32m2(xsize - x);
+        /* Load pixels as u32 to preserve alpha */
+        vuint32m2_t src = __riscv_vle32_v_u32m2((const uint32_t *)in, vl);
+        vuint32m2_t alpha = __riscv_vand_vx_u32m2(src, 0xFF000000, vl);
+        /* Load R, G, B channels with strided access */
+        vuint8mf2_t vr_u8 = __riscv_vlse8_v_u8mf2(&in[0], 4, vl);
+        vuint8mf2_t vg_u8 = __riscv_vlse8_v_u8mf2(&in[1], 4, vl);
+        vuint8mf2_t vb_u8 = __riscv_vlse8_v_u8mf2(&in[2], 4, vl);
+        vuint32m2_t vr = __riscv_vzext_vf4_u32m2(vr_u8, vl);
+        vuint32m2_t vg = __riscv_vzext_vf4_u32m2(vg_u8, vl);
+        vuint32m2_t vb = __riscv_vzext_vf4_u32m2(vb_u8, vl);
+        /* Weighted sum */
+        vuint32m2_t lum = __riscv_vmul_vx_u32m2(vr, 9798, vl);
+        lum = __riscv_vmacc_vx_u32m2(lum, 19235, vg, vl);
+        lum = __riscv_vmacc_vx_u32m2(lum, 3735, vb, vl);
+        lum = __riscv_vadd_vx_u32m2(lum, 0x4000, vl);
+        lum = __riscv_vsrl_vx_u32m2(lum, 15, vl);
+        /* Broadcast L into R,G,B bytes, OR in original alpha */
+        vuint32m2_t l8 = __riscv_vsll_vx_u32m2(lum, 8, vl);
+        vuint32m2_t l16 = __riscv_vsll_vx_u32m2(lum, 16, vl);
+        vuint32m2_t result = __riscv_vor_vv_u32m2(lum, l8, vl);
+        result = __riscv_vor_vv_u32m2(result, l16, vl);
+        result = __riscv_vor_vv_u32m2(result, alpha, vl);
+        __riscv_vse32_v_u32m2((uint32_t *)out, result, vl);
+        x += vl;
+        in += vl * 4;
+        out += vl * 4;
+    }
+#endif
     for (; x < xsize; x++, in += 4, out += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
         out[0] = out[1] = out[2] = L24(in) >> 16;
@@ -503,6 +685,9 @@ rgba2la(UINT8* out, const UINT8* in, int xsize)
 
 static void
 rgba2rgb(UINT8 *out, const UINT8 *in, int xsize) {
+#if defined(__riscv_vector)
+    rvv_rgba_to_rgb(out, in, xsize);
+#else
     int x;
     for (x = 0; x < xsize; x++) {
         *out++ = *in++;
@@ -511,6 +696,7 @@ rgba2rgb(UINT8 *out, const UINT8 *in, int xsize) {
         *out++ = 255;
         in++;
     }
+#endif
 }
 
 static void
@@ -521,7 +707,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
     int x = 0;
 
 #if defined(__AVX2__)
-    
+
     __m256i zero = _mm256_setzero_si256();
     __m256i half = _mm256_set1_epi16(128);
     __m256i maxalpha = _mm256_set_epi32(
@@ -536,7 +722,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
         source = _mm256_loadu_si256((__m256i *) &in[x * 4]);
         factorsource = _mm256_shuffle_epi8(source, factormask);
         factorsource = _mm256_or_si256(factorsource, maxalpha);
-        
+
         pix1 = _mm256_unpacklo_epi8(source, zero);
         factors = _mm256_unpacklo_epi8(factorsource, zero);
         pix1 = _mm256_add_epi16(_mm256_mullo_epi16(pix1, factors), half);
@@ -553,7 +739,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
         _mm256_storeu_si256((__m256i *) &out[x * 4], source);
     }
 
-#else
+#elif defined(__SSE4_2__)
 
     __m128i zero = _mm_setzero_si128();
     __m128i half = _mm_set1_epi16(128);
@@ -566,7 +752,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
         source = _mm_loadu_si128((__m128i *) &in[x * 4]);
         factorsource = _mm_shuffle_epi8(source, factormask);
         factorsource = _mm_or_si128(factorsource, maxalpha);
-        
+
         pix1 = _mm_unpacklo_epi8(source, zero);
         factors = _mm_unpacklo_epi8(factorsource, zero);
         pix1 = _mm_add_epi16(_mm_mullo_epi16(pix1, factors), half);
@@ -581,6 +767,33 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
 
         source = _mm_packus_epi16(pix1, pix2);
         _mm_storeu_si128((__m128i *) &out[x * 4], source);
+    }
+
+#elif defined(__riscv_vector)
+
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e8m1(xsize - x);
+        vuint8m1_t vr, vg, vb, va;
+        RVV_VLSEG4E8_U8M1(vr, vg, vb, va, &in[x * 4], vl);
+
+        vuint16m2_t alpha = __riscv_vzext_vf2_u16m2(va, vl);
+        vuint16m2_t r = __riscv_vwmulu_vv_u16m2(vr, va, vl);
+        vuint16m2_t g = __riscv_vwmulu_vv_u16m2(vg, va, vl);
+        vuint16m2_t b = __riscv_vwmulu_vv_u16m2(vb, va, vl);
+
+        r = __riscv_vadd_vx_u16m2(r, 128, vl);
+        g = __riscv_vadd_vx_u16m2(g, 128, vl);
+        b = __riscv_vadd_vx_u16m2(b, 128, vl);
+        r = __riscv_vadd_vv_u16m2(r, __riscv_vsrl_vx_u16m2(r, 8, vl), vl);
+        g = __riscv_vadd_vv_u16m2(g, __riscv_vsrl_vx_u16m2(g, 8, vl), vl);
+        b = __riscv_vadd_vv_u16m2(b, __riscv_vsrl_vx_u16m2(b, 8, vl), vl);
+
+        vuint8m1_t out_r = RVV_VNCLIPU(u8m1, r, 8, vl);
+        vuint8m1_t out_g = RVV_VNCLIPU(u8m1, g, 8, vl);
+        vuint8m1_t out_b = RVV_VNCLIPU(u8m1, b, 8, vl);
+        vuint8m1_t out_a = RVV_VNCLIPU(u8m1, alpha, 0, vl);
+        RVV_VSSEG4E8_U8M1(&out[x * 4], out_r, out_g, out_b, out_a, vl);
+        x += vl;
     }
 
 #endif
@@ -613,7 +826,7 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
         mma = _mm256_and_si256(source, _mm256_set_epi8(
             0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0,
             0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
-        
+
         mmaf = _mm256_cvtepi32_ps(_mm256_srli_epi32(source, 24));
         mmaf = _mm256_mul_ps(_mm256_set1_ps(255.5 * 256), _mm256_rcp_ps(mmaf));
         mma1 = _mm256_cvtps_epi32(mmaf);
@@ -638,7 +851,7 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
         _mm256_storeu_si256((__m256i *) &out[x * 4], source);
     }
 
-#endif
+#elif defined(__SSE4_2__)
 
     for (; x < xsize - 3; x += 4) {
         __m128 mmaf;
@@ -648,7 +861,7 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
 
         mma = _mm_and_si128(source, _mm_set_epi8(
             0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
-        
+
         mmaf = _mm_cvtepi32_ps(_mm_srli_epi32(source, 24));
         mmaf = _mm_mul_ps(_mm_set1_ps(255.5 * 256), _mm_rcp_ps(mmaf));
         mma1 = _mm_cvtps_epi32(mmaf);
@@ -669,6 +882,57 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
             0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
         _mm_storeu_si128((__m128i *) &out[x * 4], source);
     }
+
+#elif defined(__riscv_vector)
+
+    for (; x < xsize; ) {
+        size_t vl = __riscv_vsetvl_e8m1(xsize - x);
+        vuint8m1_t vr, vg, vb, va;
+        RVV_VLSEG4E8_U8M1(vr, vg, vb, va, &in[x * 4], vl);
+
+        vuint32m4_t ar = __riscv_vzext_vf4_u32m4(va, vl);
+        vbool8_t copy_mask = __riscv_vmor_mm_b8(
+            __riscv_vmseq_vx_u32m4_b8(ar, 0, vl),
+            __riscv_vmseq_vx_u32m4_b8(ar, 255, vl), vl);
+        ar = __riscv_vmerge_vxm_u32m4(ar, 1, copy_mask, vl);
+
+        vuint32m4_t factor = __riscv_vfcvt_rtz_xu_f_v_u32m4(
+            __riscv_vfrdiv_vf_f32m4(
+                __riscv_vfcvt_f_xu_v_f32m4(ar, vl), 255.5f * 256.0f, vl),
+            vl);
+
+        vuint32m4_t r32 = __riscv_vzext_vf4_u32m4(vr, vl);
+        vuint32m4_t g32 = __riscv_vzext_vf4_u32m4(vg, vl);
+        vuint32m4_t b32 = __riscv_vzext_vf4_u32m4(vb, vl);
+        r32 = __riscv_vsll_vx_u32m4(r32, 8, vl);
+        g32 = __riscv_vsll_vx_u32m4(g32, 8, vl);
+        b32 = __riscv_vsll_vx_u32m4(b32, 8, vl);
+        r32 = __riscv_vmul_vv_u32m4(r32, factor, vl);
+        g32 = __riscv_vmul_vv_u32m4(g32, factor, vl);
+        b32 = __riscv_vmul_vv_u32m4(b32, factor, vl);
+        r32 = __riscv_vsrl_vx_u32m4(r32, 16, vl);
+        g32 = __riscv_vsrl_vx_u32m4(g32, 16, vl);
+        b32 = __riscv_vsrl_vx_u32m4(b32, 16, vl);
+
+        vuint32m4_t max255 = __riscv_vmv_v_x_u32m4(255, vl);
+        r32 = __riscv_vminu_vv_u32m4(r32, max255, vl);
+        g32 = __riscv_vminu_vv_u32m4(g32, max255, vl);
+        b32 = __riscv_vminu_vv_u32m4(b32, max255, vl);
+
+        vuint16m2_t r16 = RVV_VNCLIPU(u16m2, r32, 0, vl);
+        vuint16m2_t g16 = RVV_VNCLIPU(u16m2, g32, 0, vl);
+        vuint16m2_t b16 = RVV_VNCLIPU(u16m2, b32, 0, vl);
+        vuint8m1_t out_r = RVV_VNCLIPU(u8m1, r16, 0, vl);
+        vuint8m1_t out_g = RVV_VNCLIPU(u8m1, g16, 0, vl);
+        vuint8m1_t out_b = RVV_VNCLIPU(u8m1, b16, 0, vl);
+        out_r = __riscv_vmerge_vvm_u8m1(out_r, vr, copy_mask, vl);
+        out_g = __riscv_vmerge_vvm_u8m1(out_g, vg, copy_mask, vl);
+        out_b = __riscv_vmerge_vvm_u8m1(out_b, vb, copy_mask, vl);
+        RVV_VSSEG4E8_U8M1(&out[x * 4], out_r, out_g, out_b, va, vl);
+        x += vl;
+    }
+
+#endif
 
     in = &in[x * 4];
     out = &out[x * 4];

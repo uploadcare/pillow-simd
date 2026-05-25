@@ -235,13 +235,24 @@ class FpxImageFile(ImageFile.ImageFile):
 
         return ImageFile.ImageFile.load(self)
 
+    def _close_ole(self):
+        ole = getattr(self, "ole", None)
+        if not ole:
+            return
+        fp = getattr(ole, "fp", None)
+        try:
+            ole.close()
+        finally:
+            if getattr(self, "_exclusive_fp", False) and fp and not fp.closed:
+                fp.close()
+
     def close(self):
-        self.ole.close()
+        self._close_ole()
         super().close()
 
     def __exit__(self, *args):
-        self.ole.close()
-        super().__exit__()
+        self._close_ole()
+        return super().__exit__(*args)
 
 
 #
