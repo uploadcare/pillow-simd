@@ -209,14 +209,12 @@ rgb2bit(UINT8 *out, const UINT8 *in, int xsize) {
 }
 
 static void
-rgb2l(UINT8* out, const UINT8* in, int xsize)
-{
+rgb2l(UINT8 *out, const UINT8 *in, int xsize) {
     int x = 0;
-    __m128i coeff = _mm_set_epi16(
-        0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
+    __m128i coeff = _mm_set_epi16(0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
     for (; x < xsize - 3; x += 4, in += 16) {
         __m128i pix0, pix1;
-        __m128i source = _mm_loadu_si128((__m128i*)in);
+        __m128i source = _mm_loadu_si128((__m128i *)in);
         pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
         pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
         pix0 = _mm_madd_epi16(pix0, coeff);
@@ -226,7 +224,7 @@ rgb2l(UINT8* out, const UINT8* in, int xsize)
         pix0 = _mm_srli_epi32(pix0, 15);
         pix0 = _mm_packus_epi32(pix0, pix0);
         pix0 = _mm_packus_epi16(pix0, pix0);
-        *(UINT32*)&out[x] = _mm_cvtsi128_si32(pix0);
+        *(UINT32 *)&out[x] = _mm_cvtsi128_si32(pix0);
     }
     for (; x < xsize; x++, in += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
@@ -235,14 +233,12 @@ rgb2l(UINT8* out, const UINT8* in, int xsize)
 }
 
 static void
-rgb2la(UINT8* out, const UINT8* in, int xsize)
-{
+rgb2la(UINT8 *out, const UINT8 *in, int xsize) {
     int x = 0;
-    __m128i coeff = _mm_set_epi16(
-        0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
+    __m128i coeff = _mm_set_epi16(0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
     for (; x < xsize - 3; x += 4, in += 16, out += 16) {
         __m128i pix0, pix1;
-        __m128i source = _mm_loadu_si128((__m128i*)in);
+        __m128i source = _mm_loadu_si128((__m128i *)in);
         pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
         pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
         pix0 = _mm_madd_epi16(pix0, coeff);
@@ -250,10 +246,11 @@ rgb2la(UINT8* out, const UINT8* in, int xsize)
         pix0 = _mm_hadd_epi32(pix0, pix1);
         pix0 = _mm_add_epi32(pix0, _mm_set1_epi32(0x4000));
         pix0 = _mm_srli_epi32(pix0, 15);
-        pix0 = _mm_shuffle_epi8(pix0, _mm_set_epi8(
-            -1,12,12,12, -1,8,8,8, -1,4,4,4, -1,0,0,0));
+        pix0 = _mm_shuffle_epi8(
+            pix0, _mm_set_epi8(-1, 12, 12, 12, -1, 8, 8, 8, -1, 4, 4, 4, -1, 0, 0, 0)
+        );
         pix0 = _mm_or_si128(pix0, _mm_set1_epi32(0xff000000));
-        _mm_storeu_si128((__m128i*)out, pix0);
+        _mm_storeu_si128((__m128i *)out, pix0);
     }
     for (; x < xsize; x++, in += 4, out += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
@@ -263,15 +260,13 @@ rgb2la(UINT8* out, const UINT8* in, int xsize)
 }
 
 static void
-rgb2i(UINT8* out_, const UINT8* in, int xsize)
-{
+rgb2i(UINT8 *out_, const UINT8 *in, int xsize) {
     int x = 0;
-    INT32* out = (INT32*) out_;
-    __m128i coeff = _mm_set_epi16(
-        0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
+    INT32 *out = (INT32 *)out_;
+    __m128i coeff = _mm_set_epi16(0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
     for (; x < xsize - 3; x += 4, in += 16, out += 4) {
         __m128i pix0, pix1;
-        __m128i source = _mm_loadu_si128((__m128i*)in);
+        __m128i source = _mm_loadu_si128((__m128i *)in);
         pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
         pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
         pix0 = _mm_madd_epi16(pix0, coeff);
@@ -279,10 +274,9 @@ rgb2i(UINT8* out_, const UINT8* in, int xsize)
         pix0 = _mm_hadd_epi32(pix0, pix1);
         pix0 = _mm_add_epi32(pix0, _mm_set1_epi32(0x4000));
         pix0 = _mm_srli_epi32(pix0, 15);
-        _mm_storeu_si128((__m128i*)out, pix0);
+        _mm_storeu_si128((__m128i *)out, pix0);
     }
-    for (; x < xsize; x++, in += 4)
-        *out++ = L24(in) >> 16;
+    for (; x < xsize; x++, in += 4) *out++ = L24(in) >> 16;
 }
 
 static void
@@ -445,14 +439,12 @@ rgb2rgba(UINT8 *out, const UINT8 *in, int xsize) {
 }
 
 static void
-rgba2la(UINT8* out, const UINT8* in, int xsize)
-{
+rgba2la(UINT8 *out, const UINT8 *in, int xsize) {
     int x = 0;
-    __m128i coeff = _mm_set_epi16(
-        0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
+    __m128i coeff = _mm_set_epi16(0, 3735, 19235, 9798, 0, 3735, 19235, 9798);
     for (; x < xsize - 3; x += 4, in += 16, out += 16) {
         __m128i pix0, pix1;
-        __m128i source = _mm_loadu_si128((__m128i*)in);
+        __m128i source = _mm_loadu_si128((__m128i *)in);
         __m128i alpha = _mm_and_si128(source, _mm_set1_epi32(0xff000000));
         pix0 = _mm_unpacklo_epi8(source, _mm_setzero_si128());
         pix1 = _mm_unpackhi_epi8(source, _mm_setzero_si128());
@@ -461,10 +453,11 @@ rgba2la(UINT8* out, const UINT8* in, int xsize)
         pix0 = _mm_hadd_epi32(pix0, pix1);
         pix0 = _mm_add_epi32(pix0, _mm_set1_epi32(0x4000));
         pix0 = _mm_srli_epi32(pix0, 15);
-        pix0 = _mm_shuffle_epi8(pix0, _mm_set_epi8(
-            -1,12,12,12, -1,8,8,8, -1,4,4,4, -1,0,0,0));
+        pix0 = _mm_shuffle_epi8(
+            pix0, _mm_set_epi8(-1, 12, 12, 12, -1, 8, 8, 8, -1, 4, 4, 4, -1, 0, 0, 0)
+        );
         pix0 = _mm_or_si128(pix0, alpha);
-        _mm_storeu_si128((__m128i*)out, pix0);
+        _mm_storeu_si128((__m128i *)out, pix0);
     }
     for (; x < xsize; x++, in += 4, out += 4) {
         /* ITU-R Recommendation 601-2 (assuming nonlinear RGB) */
@@ -486,29 +479,66 @@ rgba2rgb(UINT8 *out, const UINT8 *in, int xsize) {
 }
 
 static void
-rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
-{
+rgbA2rgba(UINT8 *out, const UINT8 *in, int xsize) {
     unsigned int tmp;
     unsigned char alpha;
     int x = 0;
 
 #if defined(__AVX2__)
-    
+
     __m256i zero = _mm256_setzero_si256();
     __m256i half = _mm256_set1_epi16(128);
     __m256i maxalpha = _mm256_set_epi32(
-        0xff000000, 0xff000000, 0xff000000, 0xff000000,
-        0xff000000, 0xff000000, 0xff000000, 0xff000000);
+        0xff000000,
+        0xff000000,
+        0xff000000,
+        0xff000000,
+        0xff000000,
+        0xff000000,
+        0xff000000,
+        0xff000000
+    );
     __m256i factormask = _mm256_set_epi8(
-        15,15,15,15, 11,11,11,11, 7,7,7,7, 3,3,3,3,
-        15,15,15,15, 11,11,11,11, 7,7,7,7, 3,3,3,3);
+        15,
+        15,
+        15,
+        15,
+        11,
+        11,
+        11,
+        11,
+        7,
+        7,
+        7,
+        7,
+        3,
+        3,
+        3,
+        3,
+        15,
+        15,
+        15,
+        15,
+        11,
+        11,
+        11,
+        11,
+        7,
+        7,
+        7,
+        7,
+        3,
+        3,
+        3,
+        3
+    );
     __m256i factorsource, source, pix1, pix2, factors;
 
     for (; x < xsize - 7; x += 8) {
-        source = _mm256_loadu_si256((__m256i *) &in[x * 4]);
+        source = _mm256_loadu_si256((__m256i *)&in[x * 4]);
         factorsource = _mm256_shuffle_epi8(source, factormask);
         factorsource = _mm256_or_si256(factorsource, maxalpha);
-        
+
         pix1 = _mm256_unpacklo_epi8(source, zero);
         factors = _mm256_unpacklo_epi8(factorsource, zero);
         pix1 = _mm256_add_epi16(_mm256_mullo_epi16(pix1, factors), half);
@@ -522,7 +552,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
         pix2 = _mm256_srli_epi16(pix2, 8);
 
         source = _mm256_packus_epi16(pix1, pix2);
-        _mm256_storeu_si256((__m256i *) &out[x * 4], source);
+        _mm256_storeu_si256((__m256i *)&out[x * 4], source);
     }
 
 #else
@@ -530,15 +560,15 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
     __m128i zero = _mm_setzero_si128();
     __m128i half = _mm_set1_epi16(128);
     __m128i maxalpha = _mm_set1_epi32(0xff000000);
-    __m128i factormask = _mm_set_epi8(
-        15,15,15,15, 11,11,11,11, 7,7,7,7, 3,3,3,3);
+    __m128i factormask =
+        _mm_set_epi8(15, 15, 15, 15, 11, 11, 11, 11, 7, 7, 7, 7, 3, 3, 3, 3);
     __m128i factorsource, source, pix1, pix2, factors;
 
     for (; x < xsize - 3; x += 4) {
-        source = _mm_loadu_si128((__m128i *) &in[x * 4]);
+        source = _mm_loadu_si128((__m128i *)&in[x * 4]);
         factorsource = _mm_shuffle_epi8(source, factormask);
         factorsource = _mm_or_si128(factorsource, maxalpha);
-        
+
         pix1 = _mm_unpacklo_epi8(source, zero);
         factors = _mm_unpacklo_epi8(factorsource, zero);
         pix1 = _mm_add_epi16(_mm_mullo_epi16(pix1, factors), half);
@@ -552,7 +582,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
         pix2 = _mm_srli_epi16(pix2, 8);
 
         source = _mm_packus_epi16(pix1, pix2);
-        _mm_storeu_si128((__m128i *) &out[x * 4], source);
+        _mm_storeu_si128((__m128i *)&out[x * 4], source);
     }
 
 #endif
@@ -569,8 +599,7 @@ rgbA2rgba(UINT8* out, const UINT8* in, int xsize)
 /* RGBa -> RGBA conversion to remove premultiplication
    Needed for correct transforms/resizing on RGBA images */
 static void
-rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
-{
+rgba2rgbA(UINT8 *out, const UINT8 *in, int xsize) {
     int x = 0;
     unsigned int alpha;
 
@@ -580,22 +609,124 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
         __m256 mmaf;
         __m256i pix0, pix1, mma;
         __m256i mma0, mma1;
-        __m256i source = _mm256_loadu_si256((__m256i *) &in[x * 4]);
+        __m256i source = _mm256_loadu_si256((__m256i *)&in[x * 4]);
 
-        mma = _mm256_and_si256(source, _mm256_set_epi8(
-            0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0,
-            0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
-        
+        mma = _mm256_and_si256(
+            source,
+            _mm256_set_epi8(
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0
+            )
+        );
+
         mmaf = _mm256_cvtepi32_ps(_mm256_srli_epi32(source, 24));
         mmaf = _mm256_mul_ps(_mm256_set1_ps(255.5 * 256), _mm256_rcp_ps(mmaf));
         mma1 = _mm256_cvtps_epi32(mmaf);
 
-        mma0 = _mm256_shuffle_epi8(mma1, _mm256_set_epi8(
-            5,4,5,4, 5,4,5,4, 1,0,1,0, 1,0,1,0,
-            5,4,5,4, 5,4,5,4, 1,0,1,0, 1,0,1,0));
-        mma1 = _mm256_shuffle_epi8(mma1, _mm256_set_epi8(
-            13,12,13,12, 13,12,13,12, 9,8,9,8, 9,8,9,8,
-            13,12,13,12, 13,12,13,12, 9,8,9,8, 9,8,9,8));
+        mma0 = _mm256_shuffle_epi8(
+            mma1,
+            _mm256_set_epi8(
+                5,
+                4,
+                5,
+                4,
+                5,
+                4,
+                5,
+                4,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                5,
+                4,
+                5,
+                4,
+                5,
+                4,
+                5,
+                4,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0,
+                1,
+                0
+            )
+        );
+        mma1 = _mm256_shuffle_epi8(
+            mma1,
+            _mm256_set_epi8(
+                13,
+                12,
+                13,
+                12,
+                13,
+                12,
+                13,
+                12,
+                9,
+                8,
+                9,
+                8,
+                9,
+                8,
+                9,
+                8,
+                13,
+                12,
+                13,
+                12,
+                13,
+                12,
+                13,
+                12,
+                9,
+                8,
+                9,
+                8,
+                9,
+                8,
+                9,
+                8
+            )
+        );
 
         pix0 = _mm256_unpacklo_epi8(_mm256_setzero_si256(), source);
         pix1 = _mm256_unpackhi_epi8(_mm256_setzero_si256(), source);
@@ -604,10 +735,45 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
         pix1 = _mm256_mulhi_epu16(pix1, mma1);
 
         source = _mm256_packus_epi16(pix0, pix1);
-        source = _mm256_blendv_epi8(source, mma, _mm256_set_epi8(
-            0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0,
-            0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
-        _mm256_storeu_si256((__m256i *) &out[x * 4], source);
+        source = _mm256_blendv_epi8(
+            source,
+            mma,
+            _mm256_set_epi8(
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0,
+                0xff,
+                0,
+                0,
+                0
+            )
+        );
+        _mm256_storeu_si256((__m256i *)&out[x * 4], source);
     }
 
 #endif
@@ -616,19 +782,23 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
         __m128 mmaf;
         __m128i pix0, pix1, mma;
         __m128i mma0, mma1;
-        __m128i source = _mm_loadu_si128((__m128i *) &in[x * 4]);
+        __m128i source = _mm_loadu_si128((__m128i *)&in[x * 4]);
 
-        mma = _mm_and_si128(source, _mm_set_epi8(
-            0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
-        
+        mma = _mm_and_si128(
+            source,
+            _mm_set_epi8(0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0, 0, 0)
+        );
+
         mmaf = _mm_cvtepi32_ps(_mm_srli_epi32(source, 24));
         mmaf = _mm_mul_ps(_mm_set1_ps(255.5 * 256), _mm_rcp_ps(mmaf));
         mma1 = _mm_cvtps_epi32(mmaf);
 
-        mma0 = _mm_shuffle_epi8(mma1, _mm_set_epi8(
-            5,4,5,4, 5,4,5,4, 1,0,1,0, 1,0,1,0));
-        mma1 = _mm_shuffle_epi8(mma1, _mm_set_epi8(
-            13,12,13,12, 13,12,13,12, 9,8,9,8, 9,8,9,8));
+        mma0 = _mm_shuffle_epi8(
+            mma1, _mm_set_epi8(5, 4, 5, 4, 5, 4, 5, 4, 1, 0, 1, 0, 1, 0, 1, 0)
+        );
+        mma1 = _mm_shuffle_epi8(
+            mma1, _mm_set_epi8(13, 12, 13, 12, 13, 12, 13, 12, 9, 8, 9, 8, 9, 8, 9, 8)
+        );
 
         pix0 = _mm_unpacklo_epi8(_mm_setzero_si128(), source);
         pix1 = _mm_unpackhi_epi8(_mm_setzero_si128(), source);
@@ -637,9 +807,12 @@ rgba2rgbA(UINT8* out, const UINT8* in, int xsize)
         pix1 = _mm_mulhi_epu16(pix1, mma1);
 
         source = _mm_packus_epi16(pix0, pix1);
-        source = _mm_blendv_epi8(source, mma, _mm_set_epi8(
-            0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0, 0xff,0,0,0));
-        _mm_storeu_si128((__m128i *) &out[x * 4], source);
+        source = _mm_blendv_epi8(
+            source,
+            mma,
+            _mm_set_epi8(0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0, 0, 0, 0xff, 0, 0, 0)
+        );
+        _mm_storeu_si128((__m128i *)&out[x * 4], source);
     }
 
     in = &in[x * 4];

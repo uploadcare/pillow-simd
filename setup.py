@@ -38,7 +38,6 @@ ParallelCompile("MAX_CONCURRENCY", default).install()
 
 def get_version() -> str:
     version_file = "src/PIL/_version.py"
-    l = {}
     with open(version_file, encoding="utf-8") as f:
         return f.read().split('"')[1]
 

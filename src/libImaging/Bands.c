@@ -48,7 +48,23 @@ ImagingGetBand(Imaging imIn, int band) {
     }
 
     shuffle_mask = _mm_set_epi8(
-        -1,-1,-1,-1, -1,-1,-1,-1, -1,-1,-1,-1, 12+band,8+band,4+band,0+band);
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        12 + band,
+        8 + band,
+        4 + band,
+        0 + band
+    );
 
     /* Extract band from image */
     int xsize = imIn->xsize;
@@ -59,8 +75,8 @@ ImagingGetBand(Imaging imIn, int band) {
         x = 0;
         for (; x < xsize - 3; x += 4) {
             __m128i source = _mm_loadu_si128((__m128i *)in);
-            *((UINT32 *)(out + x)) = _mm_cvtsi128_si32(
-                _mm_shuffle_epi8(source, shuffle_mask));
+            *((UINT32 *)(out + x)) =
+                _mm_cvtsi128_si32(_mm_shuffle_epi8(source, shuffle_mask));
             in += 16;
         }
         for (; x < xsize; x++) {
@@ -111,11 +127,12 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             x = 0;
             for (; x < xsize - 3; x += 4) {
                 __m128i source = _mm_loadu_si128((__m128i *)in);
-                source = _mm_shuffle_epi8(source, _mm_set_epi8(
-                    15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0));
+                source = _mm_shuffle_epi8(
+                    source,
+                    _mm_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0)
+                );
                 *((UINT32 *)(out0 + x)) = _mm_cvtsi128_si32(source);
-                *((UINT32 *)(out1 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 12));
+                *((UINT32 *)(out1 + x)) = _mm_cvtsi128_si32(_mm_srli_si128(source, 12));
                 in += 16;
             }
             for (; x < xsize; x++) {
@@ -133,13 +150,13 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             x = 0;
             for (; x < xsize - 3; x += 4) {
                 __m128i source = _mm_loadu_si128((__m128i *)in);
-                source = _mm_shuffle_epi8(source, _mm_set_epi8(
-                    15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0));
+                source = _mm_shuffle_epi8(
+                    source,
+                    _mm_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0)
+                );
                 *((UINT32 *)(out0 + x)) = _mm_cvtsi128_si32(source);
-                *((UINT32 *)(out1 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 4));
-                *((UINT32 *)(out2 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 8));
+                *((UINT32 *)(out1 + x)) = _mm_cvtsi128_si32(_mm_srli_si128(source, 4));
+                *((UINT32 *)(out2 + x)) = _mm_cvtsi128_si32(_mm_srli_si128(source, 8));
                 in += 16;
             }
             for (; x < xsize; x++) {
@@ -159,15 +176,14 @@ ImagingSplit(Imaging imIn, Imaging bands[4]) {
             x = 0;
             for (; x < xsize - 3; x += 4) {
                 __m128i source = _mm_loadu_si128((__m128i *)in);
-                source = _mm_shuffle_epi8(source, _mm_set_epi8(
-                    15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0));
+                source = _mm_shuffle_epi8(
+                    source,
+                    _mm_set_epi8(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0)
+                );
                 *((UINT32 *)(out0 + x)) = _mm_cvtsi128_si32(source);
-                *((UINT32 *)(out1 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 4));
-                *((UINT32 *)(out2 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 8));
-                *((UINT32 *)(out3 + x)) = _mm_cvtsi128_si32(
-                    _mm_srli_si128(source, 12));
+                *((UINT32 *)(out1 + x)) = _mm_cvtsi128_si32(_mm_srli_si128(source, 4));
+                *((UINT32 *)(out2 + x)) = _mm_cvtsi128_si32(_mm_srli_si128(source, 8));
+                *((UINT32 *)(out3 + x)) = _mm_cvtsi128_si32(_mm_srli_si128(source, 12));
                 in += 16;
             }
             for (; x < xsize; x++) {
