@@ -3,6 +3,9 @@
 #include <assert.h>
 #include <math.h>
 
+#include "ResampleSIMDHorizontalConv.c"
+#include "ResampleSIMDVerticalConv.c"
+
 #define ROUND_UP(f) ((int)((f) >= 0.0 ? (f) + 0.5F : (f) - 0.5F))
 
 struct filter {

@@ -38,6 +38,7 @@ ParallelCompile("MAX_CONCURRENCY", default).install()
 
 def get_version() -> str:
     version_file = "src/PIL/_version.py"
+    l = {}
     with open(version_file, encoding="utf-8") as f:
         return f.read().split('"')[1]
 
@@ -1079,7 +1080,7 @@ files.extend(
     os.path.join("src/libImaging", src_file + ".c") for src_file in _LIB_IMAGING
 )
 ext_modules = [
-    Extension("PIL._imaging", files),
+    Extension("PIL._imaging", files, extra_compile_args=["-msse4"]),
     Extension("PIL._imagingft", ["src/_imagingft.c"]),
     Extension("PIL._imagingcms", ["src/_imagingcms.c"]),
     Extension("PIL._webp", ["src/_webp.c"]),
