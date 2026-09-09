@@ -50,6 +50,18 @@ clip32(float in) {
     return (INT32)in;
 }
 
+/* 5 is number of bits enought to account all kernel coefficients (1<<5 > 25).
+   8 is number of bits in result.
+   Any coefficients delta smaller than this precision will have no effect. */
+#define PRECISION_BITS (8 + 5)
+
+#include "FilterSIMD_3x3f_u8.c"
+#include "FilterSIMD_3x3f_4u8.c"
+#include "FilterSIMD_3x3i_4u8.c"
+#include "FilterSIMD_5x5f_u8.c"
+#include "FilterSIMD_5x5f_4u8.c"
+#include "FilterSIMD_5x5i_4u8.c"
+
 Imaging
 ImagingExpand(Imaging imIn, int xmargin, int ymargin) {
     Imaging imOut;
@@ -481,12 +493,55 @@ ImagingFilter(Imaging im, int xsize, int ysize, const FLOAT32 *kernel, FLOAT32 o
     }
 
     ImagingSectionEnter(&cookie);
-    if (xsize == 3) {
-        /* 3x3 kernel. */
-        ImagingFilter3x3(imOut, im, kernel, offset);
+    if (im->type == IMAGING_TYPE_INT32) {
+        if (xsize == 3) {
+            ImagingFilter3x3(imOut, im, kernel, offset);
+        } else {
+            ImagingFilter5x5(imOut, im, kernel, offset);
+        }
     } else {
-        /* 5x5 kernel. */
-        ImagingFilter5x5(imOut, im, kernel, offset);
+        int i;
+        int fast_path = 1;
+        FLOAT32 tmp;
+        INT16 norm_kernel[25];
+        INT32 norm_offset;
+
+        for (i = 0; i < xsize * ysize; i++) {
+            tmp = kernel[i] * (1 << PRECISION_BITS);
+            tmp += (tmp >= 0) ? 0.5 : -0.5;
+            if (tmp >= 32768 || tmp <= -32769) {
+                fast_path = 0;
+                break;
+            }
+            norm_kernel[i] = tmp;
+        }
+        tmp = offset * (1 << PRECISION_BITS);
+        tmp += (tmp >= 0) ? 0.5 : -0.5;
+        if (tmp >= 1 << 30) {
+            norm_offset = 1 << 30;
+        } else if (tmp <= -1 << 30) {
+            norm_offset = -1 << 30;
+        } else {
+            norm_offset = tmp;
+        }
+
+        if (xsize == 3) {
+            if (im->image8) {
+                ImagingFilter3x3f_u8(imOut, im, kernel, offset);
+            } else if (fast_path) {
+                ImagingFilter3x3i_4u8(imOut, im, norm_kernel, norm_offset);
+            } else {
+                ImagingFilter3x3f_4u8(imOut, im, kernel, offset);
+            }
+        } else {
+            if (im->image8) {
+                ImagingFilter5x5f_u8(imOut, im, kernel, offset);
+            } else if (fast_path) {
+                ImagingFilter5x5i_4u8(imOut, im, norm_kernel, norm_offset);
+            } else {
+                ImagingFilter5x5f_4u8(imOut, im, kernel, offset);
+            }
+        }
     }
     ImagingSectionLeave(&cookie);
     return imOut;
