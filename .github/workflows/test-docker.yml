@@ -36,10 +36,6 @@ jobs:
       fail-fast: false
       matrix:
         docker: [
-          # Run slower jobs first to give them a headstart and reduce waiting time
-          ubuntu-22.04-jammy-arm64v8,
-          ubuntu-22.04-jammy-ppc64le,
-          ubuntu-22.04-jammy-s390x,
           # Then run the remainder
           alpine,
           amazon-2-amd64,
@@ -58,13 +54,6 @@ jobs:
           ubuntu-22.04-jammy-amd64,
         ]
         dockerTag: [main]
-        include:
-          - docker: "ubuntu-22.04-jammy-arm64v8"
-            qemu-arch: "aarch64"
-          - docker: "ubuntu-22.04-jammy-ppc64le"
-            qemu-arch: "ppc64le"
-          - docker: "ubuntu-22.04-jammy-s390x"
-            qemu-arch: "s390x"
 
     name: ${{ matrix.docker }}
 

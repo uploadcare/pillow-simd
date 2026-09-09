@@ -23,9 +23,10 @@ from setuptools.command.build_ext import build_ext
 
 def get_version():
     version_file = "src/PIL/_version.py"
+    l = {}
     with open(version_file, encoding="utf-8") as f:
-        exec(compile(f.read(), version_file, "exec"))
-    return locals()["__version__"]
+        exec(f.read(), {}, l)
+    return l["__version__"]
 
 
 PILLOW_VERSION = get_version()
@@ -976,7 +977,7 @@ for src_file in _IMAGING:
 for src_file in _LIB_IMAGING:
     files.append(os.path.join("src/libImaging", src_file + ".c"))
 ext_modules = [
-    Extension("PIL._imaging", files),
+    Extension("PIL._imaging", files, extra_compile_args=["-msse4"]),
     Extension("PIL._imagingft", ["src/_imagingft.c"]),
     Extension("PIL._imagingcms", ["src/_imagingcms.c"]),
     Extension("PIL._webp", ["src/_webp.c"]),
