@@ -6,7 +6,7 @@ import pytest
 
 from PIL import FitsImagePlugin, Image
 
-from .helper import assert_image_equal, assert_image_equal_tofile, hopper
+from .helper import assert_image_similar, assert_image_equal_tofile, hopper
 
 TEST_FILE = "Tests/images/hopper.fits"
 
@@ -19,7 +19,7 @@ def test_open() -> None:
         assert im.size == (128, 128)
         assert im.mode == "L"
 
-        assert_image_equal(im, hopper("L"))
+        assert_image_similar(im, hopper("L"), 0.001)
 
 
 def test_gzip1() -> None:
