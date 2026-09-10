@@ -149,6 +149,7 @@ class TestFileWebp:
         self._roundtrip(tmp_path, "P", 50.0)
 
     @pytest.mark.skipif(sys.maxsize <= 2**32, reason="Requires 64-bit system")
+    @pytest.mark.mem
     def test_write_encoding_error_message(self, tmp_path: Path) -> None:
         temp_file = str(tmp_path / "temp.webp")
         im = Image.new("RGB", (15000, 15000))

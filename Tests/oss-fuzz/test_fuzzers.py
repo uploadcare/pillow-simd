@@ -22,7 +22,12 @@ if features.check("libjpeg_turbo"):
 
 @pytest.mark.parametrize(
     "path",
-    subprocess.check_output("find Tests/images -type f", shell=True).split(b"\n"),
+    [
+        pytest.param(path, marks=pytest.mark.mem if path.endswith(b".blp") else ())
+        for path in subprocess.check_output(
+            "find Tests/images -type f", shell=True
+        ).split(b"\n")
+    ],
 )
 def test_fuzz_images(path: str) -> None:
     fuzzers.enable_decompressionbomb_error()

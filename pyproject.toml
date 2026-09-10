@@ -132,6 +132,7 @@ required-imports = ["from __future__ import annotations"]
 [tool.pytest.ini_options]
 addopts = "-ra --color=yes"
 testpaths = ["Tests"]
+markers = ["mem: requires a large amount of memory"]
 
 [tool.mypy]
 python_version = "3.8"
