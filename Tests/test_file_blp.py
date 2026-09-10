@@ -56,6 +56,7 @@ def test_save(tmp_path):
         im.save(f)
 
 
+@pytest.mark.mem
 @pytest.mark.parametrize(
     "test_file",
     [
