@@ -155,6 +155,7 @@ class TestFileWebp:
         self._roundtrip(tmp_path, "P", 50.0)
 
     @pytest.mark.skipif(sys.maxsize <= 2**32, reason="Requires 64-bit system")
+    @pytest.mark.mem
     def test_write_encoding_error_message(self, tmp_path: Path) -> None:
         im = Image.new("RGB", (15000, 15000))
         with pytest.raises(ValueError) as e:
@@ -162,6 +163,7 @@ class TestFileWebp:
         assert str(e.value) == "encoding error 6"
 
     @pytest.mark.skipif(sys.maxsize <= 2**32, reason="Requires 64-bit system")
+    @pytest.mark.mem
     def test_write_encoding_error_bad_dimension(self, tmp_path: Path) -> None:
         im = Image.new("L", (16384, 16384))
         with pytest.raises(ValueError) as e:
